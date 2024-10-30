@@ -1,13 +1,13 @@
 
 
-# 背景
+# cpp-database-mysql
 
 MySQL数据库已经成为构建互联网世界的基石，尤其是其支持事务的特性，支撑了很多互联网的很多应用场景，比如电商、支付等。我们在tRPC-cpp中提供了以客户端的方式访问下游MySQL服务。
 
 该组件基于MySQL 8.0的c api(libmysqlclient)，对MySQL server进行调用。并使用框架内的线程池进行驱动，因此对api的调用不会阻塞工作线程和fiber协程。以下相关类均在 **namespace trpc::mysql** 之内。
 
 
-
+- [如何引入](#如何引入)
 - [简单使用示例](#简单使用示例)
 - [查询结果类](#查询结果类)
 - [用户接口](#用户接口)
@@ -17,6 +17,79 @@ MySQL数据库已经成为构建互联网世界的基石，尤其是其支持事
     - [插入和更新](#插入和更新)
     - [事务](#事务)
     - [异步接口](#异步接口)
+
+
+## 如何引入
+
+### Bazel
+
+1. 引入仓库
+
+   在项目的WORKSPACE文件中，引入cpp-database-mysql仓库及其依赖：
+   ```python
+   load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+
+   git_repository(
+       name = "trpc_cpp",
+       remote = "https://github.com/trpc-group/trpc-cpp.git",
+       branch = "main",
+   )
+   
+   load("@trpc_cpp//trpc:workspace.bzl", "trpc_workspace")
+   trpc_workspace()
+      
+   git_repository(
+       name = "cpp_database_mysql",
+       remote = "https://github.com/trpc-ecosystem/cpp-database-mysql.git",
+       branch = "main",
+   )
+   
+   load("@cpp_database_mysql//trpc:workspace.bzl", "database_mysql_workspace")
+   database_mysql_workspace()
+   ```
+2. 引入依赖
+
+   在需要用到OpenTelemetry的目标中引入“`trpc/client/mysql:mysql_service_proxy`”依赖。例如：
+
+   ```python
+   cc_binary(
+    name = "fiber_client",
+    srcs = ["fiber_client.cc"],
+    deps = [
+        "@cpp_database_mysql//trpc/client/mysql:mysql_service_proxy",
+        ...
+    ],
+   )
+   ```
+
+### CMake
+
+参考如下的 CMakeLists.txt 来组织项目：
+
+```bash
+# First, import trpc-cpp.
+include(FetchContent)
+FetchContent_Declare(
+    trpc-cpp
+    GIT_REPOSITORY    https://github.com/trpc-group/trpc-cpp.git
+    GIT_TAG           main
+    SOURCE_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/cmake_third_party/trpc-cpp
+)
+FetchContent_MakeAvailable(trpc-cpp)
+
+# Then, import cpp-database-mysql
+FetchContent_Declare(
+    trpc_cpp_database_mysql
+    GIT_REPOSITORY    https://github.com/trpc-ecosystem/cpp-database-mysql.git
+    GIT_TAG           main
+    SOURCE_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/cmake_third_party/trpc_cpp_database_mysql
+)
+FetchContent_MakeAvailable(trpc_cpp_database_mysql)
+
+# Last, link to your target
+target_link_libraries(your_target trpc
+                                  trpc_cpp_database_mysql)
+```
 
 
 
@@ -545,4 +618,5 @@ TransactionHandle handle2(fu3.GetValue0());
 只要有 handle，后续这个事务也可以使用同步事务接口。
 
 你也可以直接在Then Chain里面完成整个事务，并没有什么特别的地方，详情见  [future_client.cc](./examples/features/mysql/client/future/future_client.cc)
+
 

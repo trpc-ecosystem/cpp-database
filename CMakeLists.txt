@@ -23,7 +23,7 @@ message("Cloning trpc-cpp, please waiting...")
 include(com_github_trpc_cpp)
 
 message("Fetching mysql libs, please waiting...")
-include(com_github_opentelemetry_cpp)
+include(mysqlclient.cmake)
 
 file(GLOB_RECURSE SRC_FILES ./trpc/client/*.cc)
 
