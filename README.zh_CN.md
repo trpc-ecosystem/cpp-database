@@ -576,7 +576,7 @@ trpc::future::BlockingGet(std::move(future));
 
 这里 `proxy->AsyncQuery<int, std::string>(ctx, "select id, username from users where id = ?", 3)` 应当返回 `Future<MysqlResults<int, std::string>>` ，然后通过 `Then`  回调处理查询结果， 将 `AsyncQuery` 返回的 future 中的值获取出来，然后打印，最后返回一个就绪的空future。
 
-**对于异步事务接口**，参考 [future_client.cc](./examples/features/mysql/client/future/future_client.cc)
+**对于异步事务接口**，参考 [future_client.cc](./examples/mysql/client/future/future_client.cc)
 
 ```c++
 MysqlResults<OnlyExec> exec_res;
@@ -617,6 +617,6 @@ TransactionHandle handle2(fu3.GetValue0());
 
 只要有 handle，后续这个事务也可以使用同步事务接口。
 
-你也可以直接在Then Chain里面完成整个事务，并没有什么特别的地方，详情见  [future_client.cc](./examples/features/mysql/client/future/future_client.cc)
+你也可以直接在Then Chain里面完成整个事务，并没有什么特别的地方，详情见  [future_client.cc](./examples/mysql/client/future/future_client.cc)
 
 
