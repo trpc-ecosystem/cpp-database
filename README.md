@@ -210,7 +210,7 @@ class MysqlResults
 | `bool IsValueNull(size_t row_index, size_t col_index)` | 结果集中某个值是否为空                                       |
 | `const std::vector<std::string>& GetFieldsName()`      | 获取结果表字段名                                             |
 
-
+请不要使用 MysqlResult<OnlyExec> 中的 `GetResultSet` 和 `ResultSet`。同时 `MysqlResult<OnlyExec>::GetFieldsName()` 返回是空的 vector。
 
 ### 使用示例
 

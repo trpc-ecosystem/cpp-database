@@ -210,7 +210,7 @@ class MysqlResults
 | `bool IsValueNull(size_t row_index, size_t col_index)` | 结果集中某个值是否为空                                       |
 | `const std::vector<std::string>& GetFieldsName()`      | 获取结果表字段名                                             |
 
-
+请不要使用 MysqlResult<OnlyExec> 中的 `GetResultSet` 和 `ResultSet`。同时 `MysqlResult<OnlyExec>::GetFieldsName()` 返回是空的 vector。
 
 ### 使用示例
 
@@ -236,12 +236,12 @@ mysql> select * from users;
 // example
 MysqlResults<OnlyExec> exec_res;
 proxy->Execute(client_context, exec_res,
-             "insert into users (username)"
-             "values (?)", "Jack");
+"insert into users (username)"
+"values (?)", "Jack");
 if(exe_res.OK())
-    size_t n_rows = exec_res.GetAffectedRowNum()
+size_t n_rows = exec_res.GetAffectedRowNum()
 else
-    std::string error = exec_res.GetErrorMessage()
+std::string error = exec_res.GetErrorMessage()
 ```
 
 用于像 `INSERT`、`UPDATE` 这类不会返回结果集的查询操作。通过 `GetAffectedRowNum()` 获取影响的行。
@@ -254,7 +254,7 @@ else
 
 MysqlResults<NativeString> query_res;
 proxy->Execute(client_context, query_res,
-             "select * from users");
+"select * from users");
 
 using ResSetType = std::vector<std::vector<std::string_view>>;
 // ResSetType& res_data = query_res.ResultSet();
@@ -262,7 +262,7 @@ auto& res_data = query_res.ResultSet();
 
 std::cout << res_data[0][1] << std::endl;  // alice@example.com
 if(query_res.IsValueNull(3, 2) != 0)
-    std::cout << "rose's email is null" << std::endl;
+std::cout << "rose's email is null" << std::endl;
 
 ```
 
@@ -277,19 +277,19 @@ if(query_res.IsValueNull(3, 2) != 0)
 // example
 MysqlResults<int, std::string, MysqlTime> query_res;
 proxy->Execute(client_context, query_res,
-               "select id, email, created_at from users "
-               "where id = 1 or username = \"bob\")";
+"select id, email, created_at from users "
+"where id = 1 or username = \"bob\")";
 
 using ResSetType = std::vector<std::tuple<int, std::string, MysqlTime>>;
 if(query_res.OK()) {
-    // ResSetType& res_set = query_res.ResultSet();
-	auto& res_set = query_res.ResultSet();
-    int id = std::get<0>(res_set[0]);
-    std::string email = std::get<1>(res_set[1]);
-    MysqlTime mtime = std::get<2>(res_set[1]);
-}         
+// ResSetType& res_set = query_res.ResultSet();
+auto& res_set = query_res.ResultSet();
+int id = std::get<0>(res_set[0]);
+std::string email = std::get<1>(res_set[1]);
+MysqlTime mtime = std::get<2>(res_set[1]);
+}
 else
-    std::string error = exec_res.GetErrorMessage()
+std::string error = exec_res.GetErrorMessage()
 ```
 
 使用类型绑定，如果模板指定为除 `OnlyExec`，`NativeString`之外的其它类型，则结果集的每一行是一个tuple。（这里关于 `MysqlTime` 的使用见[日期和Blob](#更多类型)）
