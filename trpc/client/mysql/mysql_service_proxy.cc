@@ -11,10 +11,12 @@
 //
 //
 
-#include "trpc/client/mysql/mysql_service_proxy.h"
 #include <iostream>
+#include "trpc/client/mysql/mysql_service_proxy.h"
 #include "trpc/client/service_proxy_option.h"
 #include "trpc/util/string/string_util.h"
+#include "trpc/client/mysql/config/mysql_client_conf_parser.h"
+
 namespace trpc::mysql {
 
 MysqlServiceProxy::MysqlServiceProxy() {
@@ -28,13 +30,13 @@ bool MysqlServiceProxy::InitManager() {
 
   const ServiceProxyOption* option = GetServiceProxyOption();
   MysqlExecutorPoolOption pool_option;
-  pool_option.user_name = option->mysql_conf.user_name;
-  pool_option.password = option->mysql_conf.password;
-  pool_option.dbname = option->mysql_conf.dbname;
+  pool_option.user_name = mysql_conf_.user_name;
+  pool_option.password = mysql_conf_.password;
+  pool_option.dbname = mysql_conf_.dbname;
   pool_option.max_size = option->max_conn_num;
   pool_option.max_idle_time = option->idle_time;
-  pool_option.num_shard_group = option->mysql_conf.num_shard_group;
-  pool_option.char_set = option->mysql_conf.char_set;
+  pool_option.num_shard_group = mysql_conf_.num_shard_group;
+  pool_option.char_set = mysql_conf_.char_set;
   pool_manager_ = std::make_unique<MysqlExecutorPoolManager>(std::move(pool_option));
   return true;
 }
@@ -44,15 +46,28 @@ bool MysqlServiceProxy::InitThreadPool() {
   if(thread_pool_ != nullptr)
       return true;
 
-  const ServiceProxyOption* option = GetServiceProxyOption();
   ::trpc::ThreadPoolOption thread_pool_option;
-  thread_pool_option.thread_num = option->mysql_conf.thread_num;
-  thread_pool_option.bind_core = option->mysql_conf.thread_bind_core;
+  thread_pool_option.thread_num = mysql_conf_.thread_num;
+  thread_pool_option.bind_core = mysql_conf_.thread_bind_core;
   thread_pool_ = std::make_unique<::trpc::ThreadPool>(std::move(thread_pool_option));
   thread_pool_->Start();
   return true;
 }
 
+void MysqlServiceProxy::SetServiceProxyOptionInner(const std::shared_ptr<ServiceProxyOption> &option) {
+  ServiceProxy::SetServiceProxyOptionInner(option);
+  YAML::Node node;
+  ConfigHelper::GetInstance()->GetNode({"client", "service"}, node);
+  for (auto && idx : node) {
+    if(idx["name"].as<std::string>() == option->name) {
+      mysql_conf_ = idx["mysql"].as<::trpc::mysql::MysqlClientConf>();
+      break;
+    }
+  }
+  mysql_conf_.Display();
+  InitThreadPool();
+  InitManager();
+}
 
 void MysqlServiceProxy::Destroy() {
   ServiceProxy::Destroy();
@@ -65,12 +80,6 @@ void MysqlServiceProxy::Stop() {
   thread_pool_->Stop();
   pool_manager_->Stop();
 }
-
-void MysqlServiceProxy::InitOtherMembers() {
-  InitManager();
-  InitThreadPool();
-}
-
 
 Status MysqlServiceProxy::Begin(const ClientContextPtr& context, TransactionHandle &handle) {
 
@@ -258,5 +267,7 @@ bool MysqlServiceProxy::EndTransaction(TransactionHandle &handle, bool rollback)
   }
   return true;
 }
+
+
 
 }  // namespace trpc::mysql

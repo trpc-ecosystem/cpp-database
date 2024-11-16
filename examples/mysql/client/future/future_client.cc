@@ -21,7 +21,7 @@
 #include <iostream>
 #include "trpc/client/client_context.h"
 #include "trpc/client/make_client_context.h"
-#include "trpc/client/mysql/mysql_service_proxy.h"
+#include "trpc/client/mysql/mysql_plugin.h"
 #include "trpc/client/service_proxy.h"
 #include "trpc/client/trpc_client.h"
 #include "trpc/common/runtime_manager.h"
@@ -243,6 +243,8 @@ void ParseClientConfig(int argc, char* argv[]) {
     std::cerr << "load client_config failed." << std::endl;
     exit(-1);
   }
+
+  ::trpc::mysql::InitPlugin();
 }
 
 int main(int argc, char* argv[]) {

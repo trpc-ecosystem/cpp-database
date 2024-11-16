@@ -131,6 +131,19 @@ client:
 
 ```
 
+#### 初始化插件
+在你使用相关组件之前，请用一下代码做初始化（只需要全局调用一次）
+```c++
+#include "trpc/client/mysql/mysql_plugin.h"
+
+// Other code ....
+
+::trpc::mysql::InitPlugin();
+
+// Then you can use this plugin
+// ...
+```
+
 #### 访问过程
 
 1. 获取proxy, 使用 `::trpc::GetTrpcClient()->GetProxy<MysqlServiceProxy>(...)`。

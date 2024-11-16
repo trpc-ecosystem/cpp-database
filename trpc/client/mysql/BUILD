@@ -2,6 +2,18 @@ licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
 
+cc_library(
+    name = "mysql_plugin",
+    srcs = ["mysql_plugin.cc"],
+    hdrs = ["mysql_plugin.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":mysql_service_proxy",
+        "//trpc/client/mysql/codec:mysql_client_codec",
+        "@trpc_cpp//trpc/codec:codec_manager"
+    ],
+)
+
 
 cc_library(
     name = "transaction",
@@ -36,15 +48,18 @@ cc_library(
         ":mysql_service_config",
         ":transaction",
         "//trpc/client/mysql/executor:mysql_executor",
+        "//trpc/client/mysql/config:mysql_client_conf",
+        "//trpc/client/mysql/config:mysql_client_conf_parser",
         "@trpc_cpp//trpc/client:service_proxy_option",
-        "@trpc_cpp//trpc/codec:client_codec_factory",
-        "@trpc_cpp//trpc/codec/mysql:mysql_client_codec",
+#        "@trpc_cpp//trpc/codec:client_codec_factory",
+#        "@trpc_cpp//trpc/codec/mysql:mysql_client_codec",
         "@trpc_cpp//trpc/util/string:string_util",
         "@trpc_cpp//trpc/util/thread:thread_pool",
         "@trpc_cpp//trpc/util/thread:latch",
         "@trpc_cpp//trpc/coroutine:fiber",
         "@trpc_cpp//trpc/client:service_proxy",
         "@trpc_cpp//trpc/common/logging:trpc_logging",
+        "@trpc_cpp//trpc/client:service_proxy_manager",
     ],
     visibility = ["//visibility:public"]
 )
@@ -55,7 +70,7 @@ cc_library(
     hdrs = ["mysql_executor_pool_manager.h"],
     deps = [
         ":mysql_executor_pool",
-        "@trpc_cpp//trpc/common/config:mysql_client_conf",
+        "//trpc/client/mysql/config:mysql_client_conf",
         "@trpc_cpp//trpc/util/concurrency:lightly_concurrent_hashmap"
     ],
     visibility = ["//visibility:public"],

@@ -17,18 +17,21 @@
 #include "trpc/client/mysql/mysql_executor_pool.h"
 #include "trpc/client/mysql/mysql_executor_pool_manager.h"
 #include "trpc/client/service_proxy.h"
+#include "trpc/client/service_proxy_manager.h"
 #include "trpc/coroutine/fiber_event.h"
 #include "trpc/util/ref_ptr.h"
 #include "trpc/util/thread/latch.h"
-#include "trpc/coroutine//fiber_latch.h"
+#include "trpc/coroutine/fiber_latch.h"
 #include "trpc/util/thread/thread_pool.h"
 #include "trpc/client/mysql/transaction.h"
+#include "trpc/client/mysql/config/mysql_client_conf.h"
+
 
 namespace trpc::mysql {
 
 class MysqlServiceProxy : public ServiceProxy {
-
   using ExecutorPtr = RefPtr<MysqlExecutor>;
+  friend class trpc::ServiceProxyManager;
  public:
   MysqlServiceProxy();
 
@@ -125,16 +128,15 @@ class MysqlServiceProxy : public ServiceProxy {
   void Destroy() override;
 
  protected:
-  /// @brief Init pool_manager_.
-  void InitOtherMembers() override;
+  /// @brief Init pool manager and thread pool.
+  void SetServiceProxyOptionInner(const std::shared_ptr<ServiceProxyOption>& option) override;
 
  private:
   ///@brief pool_manager_ only can be inited after the service option has been set.
   bool InitManager();
 
+  ///@brief thread_pool_ only can be inited after the service option has been set.
   bool InitThreadPool();
-
-
 
    /// @param context
    /// @param executor If executor is nullptr, it will get a executor from executor manager.
@@ -150,11 +152,13 @@ class MysqlServiceProxy : public ServiceProxy {
   Future<MysqlResults<OutputArgs...>> AsyncUnaryInvoke(const ClientContextPtr& context, const ExecutorPtr& executor, const std::string& sql_str,
                                                        const InputArgs&... args);
 
+
   bool EndTransaction(TransactionHandle& handle, bool rollback);
 
  private:
   std::unique_ptr<ThreadPool> thread_pool_{nullptr};
   std::unique_ptr<MysqlExecutorPoolManager> pool_manager_;
+  ::trpc::mysql::MysqlClientConf mysql_conf_;
 };
 
 template <typename... OutputArgs, typename... InputArgs>
