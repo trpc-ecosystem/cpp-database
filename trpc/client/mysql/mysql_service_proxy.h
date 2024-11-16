@@ -127,6 +127,8 @@ class MysqlServiceProxy : public ServiceProxy {
 
   void Destroy() override;
 
+  void SetMysqlConfig(const MysqlClientConf& conf);
+
  protected:
   /// @brief Init pool manager and thread pool.
   void SetServiceProxyOptionInner(const std::shared_ptr<ServiceProxyOption>& option) override;
@@ -158,7 +160,7 @@ class MysqlServiceProxy : public ServiceProxy {
  private:
   std::unique_ptr<ThreadPool> thread_pool_{nullptr};
   std::unique_ptr<MysqlExecutorPoolManager> pool_manager_;
-  ::trpc::mysql::MysqlClientConf mysql_conf_;
+  MysqlClientConf mysql_conf_;
 };
 
 template <typename... OutputArgs, typename... InputArgs>

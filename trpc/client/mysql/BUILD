@@ -51,8 +51,6 @@ cc_library(
         "//trpc/client/mysql/config:mysql_client_conf",
         "//trpc/client/mysql/config:mysql_client_conf_parser",
         "@trpc_cpp//trpc/client:service_proxy_option",
-#        "@trpc_cpp//trpc/codec:client_codec_factory",
-#        "@trpc_cpp//trpc/codec/mysql:mysql_client_codec",
         "@trpc_cpp//trpc/util/string:string_util",
         "@trpc_cpp//trpc/util/thread:thread_pool",
         "@trpc_cpp//trpc/util/thread:latch",

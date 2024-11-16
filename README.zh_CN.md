@@ -49,7 +49,7 @@ MySQL数据库已经成为构建互联网世界的基石，尤其是其支持事
    ```
 2. 引入依赖
 
-   在需要用到OpenTelemetry的目标中引入“`trpc/client/mysql:mysql_service_proxy`”依赖。例如：
+   在需要用到此插件的目标中引入“`trpc/client/mysql:mysql_service_proxy`”依赖。例如：
 
    ```python
    cc_binary(

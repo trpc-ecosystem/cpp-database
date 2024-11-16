@@ -268,6 +268,9 @@ bool MysqlServiceProxy::EndTransaction(TransactionHandle &handle, bool rollback)
   return true;
 }
 
+void MysqlServiceProxy::SetMysqlConfig(const MysqlClientConf &conf) {
+  mysql_conf_ = conf;
+}
 
 
 }  // namespace trpc::mysql
