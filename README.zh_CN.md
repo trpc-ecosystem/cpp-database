@@ -56,7 +56,7 @@ MySQL数据库已经成为构建互联网世界的基石，尤其是其支持事
     name = "fiber_client",
     srcs = ["fiber_client.cc"],
     deps = [
-        "@cpp_database_mysql//trpc/client/mysql:mysql_service_proxy",
+        "@cpp_database_mysql//trpc/client/mysql:mysql_plugin",
         ...
     ],
    )
