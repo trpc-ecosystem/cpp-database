@@ -40,10 +40,10 @@ set_target_properties(mysqlclient PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${MYSQLCLIENT_INCLUDE_DIR}"
 )
 
-target_link_libraries(mysqlclient INTERFACE
-        "${MYSQLCLIENT_LIB_DIR}/private/libcrypto.so"
-        "${MYSQLCLIENT_LIB_DIR}/private/libssl.so"
-)
+#target_link_libraries(mysqlclient INTERFACE
+#        "${MYSQLCLIENT_LIB_DIR}/private/libcrypto.so"
+#        "${MYSQLCLIENT_LIB_DIR}/private/libssl.so"
+#)
 
 add_library(trpc_mysqlclient ALIAS mysqlclient)
 
