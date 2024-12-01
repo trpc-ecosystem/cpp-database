@@ -39,7 +39,8 @@ struct MysqlClientConf {
   size_t thread_num{4};
 
   // thread_bind_core for thread pool
-  bool thread_bind_core{false};
+  // An input example of '1,5-7' will be converted to a list of [1, 5, 6, 7].
+  std::string thread_bind_core{""};
 
   /// Only For MysqlExecutorPoolImpl
   uint32_t num_shard_group{4};

@@ -10,12 +10,14 @@
 // A copy of the Apache 2.0 License is included in this file.
 //
 //
+#include "trpc/client/mysql/mysql_service_proxy.h"
 
 #include <iostream>
-#include "trpc/client/mysql/mysql_service_proxy.h"
+
 #include "trpc/client/service_proxy_option.h"
 #include "trpc/util/string/string_util.h"
 #include "trpc/client/mysql/config/mysql_client_conf_parser.h"
+#include "trpc/util/bind_core_manager.h"
 
 namespace trpc::mysql {
 
@@ -48,8 +50,9 @@ bool MysqlServiceProxy::InitThreadPool() {
 
   ::trpc::ThreadPoolOption thread_pool_option;
   thread_pool_option.thread_num = mysql_conf_.thread_num;
-  thread_pool_option.bind_core = mysql_conf_.thread_bind_core;
+  thread_pool_option.bind_core = !mysql_conf_.thread_bind_core.empty();
   thread_pool_ = std::make_unique<::trpc::ThreadPool>(std::move(thread_pool_option));
+  BindCoreManager::ParseBindCoreGroup(mysql_conf_.thread_bind_core);
   thread_pool_->Start();
   return true;
 }

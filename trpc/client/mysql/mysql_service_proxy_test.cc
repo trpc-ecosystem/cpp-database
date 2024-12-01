@@ -11,14 +11,13 @@
 //
 //
 
+#include "trpc/client/mysql/mysql_service_proxy.h"
+
 #include <utility>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "mysql_service_proxy.h"
-
 #include "trpc/client/make_client_context.h"
 #include "trpc/client/service_proxy_option_setter.h"
 #include "trpc/common/trpc_plugin.h"
@@ -97,10 +96,6 @@ class MysqlServiceProxyTest : public ::testing::Test {
     option_->timeout = 1000;
     option_->target = "localhost:3306";
     option_->selector_name = "direct";
-    option_->mysql_conf.dbname = "test";
-    option_->mysql_conf.password = "abc123";
-    option_->mysql_conf.user_name = "root";
-    option_->mysql_conf.enable = true;
     option_->max_conn_num = 12;
   }
 

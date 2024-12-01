@@ -58,6 +58,7 @@ cc_library(
         "@trpc_cpp//trpc/client:service_proxy",
         "@trpc_cpp//trpc/common/logging:trpc_logging",
         "@trpc_cpp//trpc/client:service_proxy_manager",
+        "@trpc_cpp//trpc/util:bind_core_manager"
     ],
     visibility = ["//visibility:public"]
 )

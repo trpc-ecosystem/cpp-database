@@ -472,12 +472,11 @@ void ParseClientConfig(int argc, char* argv[]) {
     std::cerr << "load client_config failed." << std::endl;
     exit(-1);
   }
-
-  ::trpc::mysql::InitPlugin();
 }
 
 int main(int argc, char* argv[]) {
   ParseClientConfig(argc, argv);
+  ::trpc::mysql::InitPlugin();
   std::cout << "************************************\n"
             << "************fiber_client************\n"
             << "************************************\n\n";

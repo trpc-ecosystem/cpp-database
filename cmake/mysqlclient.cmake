@@ -2,7 +2,6 @@
 
 include(FetchContent)
 
-
 if(NOT DEFINED MYSQLCLIENT_VERSION_TAG)
     set(MYSQLCLIENT_VERSION_TAG 8.0.39)
 endif()
@@ -40,10 +39,10 @@ set_target_properties(mysqlclient PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${MYSQLCLIENT_INCLUDE_DIR}"
 )
 
-#target_link_libraries(mysqlclient INTERFACE
-#        "${MYSQLCLIENT_LIB_DIR}/private/libcrypto.so"
-#        "${MYSQLCLIENT_LIB_DIR}/private/libssl.so"
-#)
+target_link_libraries(mysqlclient INTERFACE
+        crypto
+        ssl
+)
 
 add_library(trpc_mysqlclient ALIAS mysqlclient)
 

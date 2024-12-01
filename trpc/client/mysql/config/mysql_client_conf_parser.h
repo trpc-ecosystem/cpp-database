@@ -51,7 +51,7 @@ struct convert<trpc::mysql::MysqlClientConf> {
       mysql_conf.thread_num = node["thread_num"].as<size_t>();
     }
     if (node["thread_bind_core"]) {
-      mysql_conf.thread_bind_core = node["thread_bind_core"].as<bool>();
+      mysql_conf.thread_bind_core = node["thread_bind_core"].as<std::string>();
     }
     if (node["num_shard_group"]) {
       mysql_conf.num_shard_group = node["num_shard_group"].as<uint32_t>();
