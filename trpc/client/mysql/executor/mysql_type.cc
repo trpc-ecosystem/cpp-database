@@ -157,11 +157,11 @@ bool MysqlBlob::operator==(const MysqlBlob &other) const {
   return data_ == other.data_;
 }
 
-const char *MysqlBlob::data_ptr() const {
+const char *MysqlBlob::DataConstPtr() const {
   return data_.data();
 }
 
-size_t MysqlBlob::size() const {
+size_t MysqlBlob::Size() const {
   return data_.size();
 }
 

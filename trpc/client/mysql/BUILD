@@ -14,6 +14,16 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "mysql_error_number",
+    hdrs = ["mysql_error_number.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@trpc_cpp//trpc/common:status"
+    ],
+)
+
+
 
 cc_library(
     name = "transaction",
@@ -33,7 +43,6 @@ cc_library(
         "@trpc_cpp//trpc/transport/common:transport_message_common",
         "//trpc/client/mysql/executor:mysql_executor",
         "@trpc_cpp//trpc/util/log:logging",
-        ":mysql_service_config",
     ],
     visibility = ["//visibility:public"],
 )
@@ -45,8 +54,8 @@ cc_library(
     deps = [
         ":mysql_executor_pool",
         ":mysql_executor_pool_manager",
-        ":mysql_service_config",
         ":transaction",
+        ":mysql_error_number",
         "//trpc/client/mysql/executor:mysql_executor",
         "//trpc/client/mysql/config:mysql_client_conf",
         "//trpc/client/mysql/config:mysql_client_conf_parser",
@@ -75,22 +84,12 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-cc_library(
-    name = "mysql_service_config",
-    hdrs = ["mysql_service_config.h"],
-    visibility = ["//visibility:public"],
-)
-
-
-
-
 cc_test(
     name = "mysql_service_proxy_test",
     srcs = ["mysql_service_proxy_test.cc"],
         visibility = ["//visibility:public"],
     deps = [
-        ":mysql_service_proxy",
-        ":mysql_executor_pool_manager",
+        ":mysql_plugin",
         "@trpc_cpp//trpc/client:make_client_context",
         "@trpc_cpp//trpc/client:service_proxy_option_setter",
         "@trpc_cpp//trpc/common:trpc_plugin",
@@ -115,8 +114,8 @@ cc_test(
     visibility = ["//visibility:public"],
     deps = [
         "//trpc/client/mysql/executor:mysql_executor",
+        "//trpc/client/mysql/config:mysql_client_conf",
         ":mysql_executor_pool_manager",
-        ":mysql_service_config",
         "@trpc_cpp//trpc/common/config:trpc_config",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",

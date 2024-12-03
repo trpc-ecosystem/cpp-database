@@ -104,8 +104,8 @@ inline void StepInputBind(MYSQL_BIND& bind, const T& value) {
 inline void StepInputBind(MYSQL_BIND& bind, const MysqlBlob& value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MYSQL_TYPE_BLOB;
-  bind.buffer = BIND_POINTER_CAST(value.data_ptr());
-  bind.buffer_length = value.size();
+  bind.buffer = BIND_POINTER_CAST(value.DataConstPtr());
+  bind.buffer_length = value.Size();
   bind.length = &bind.buffer_length;
   bind.is_unsigned = false;
 }

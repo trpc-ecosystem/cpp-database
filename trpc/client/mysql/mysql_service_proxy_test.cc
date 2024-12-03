@@ -11,7 +11,7 @@
 //
 //
 
-#include "trpc/client/mysql/mysql_service_proxy.h"
+#include "trpc/client/mysql/mysql_plugin.h"
 
 #include <utility>
 #include <vector>
@@ -30,6 +30,16 @@ using trpc::mysql::NativeString;
 using trpc::mysql::MysqlResults;
 using trpc::mysql::MysqlTime;
 using trpc::mysql::TransactionHandle;
+using trpc::mysql::TxHandlePtr;
+
+class GlobalEnvironment : public ::testing::Environment {
+ public:
+  void SetUp() override {
+    ::trpc::mysql::InitPlugin();
+  }
+};
+
+::testing::Environment* const global_env = ::testing::AddGlobalTestEnvironment(new GlobalEnvironment());
 
  class MockMysqlServiceProxy : public mysql::MysqlServiceProxy {
  public:
@@ -103,8 +113,16 @@ class MysqlServiceProxyTest : public ::testing::Test {
 
  protected:
   void SetUp() override {
+
+    mysql::MysqlClientConf mysql_conf;
+    mysql_conf.dbname = "test";
+    mysql_conf.password = "abc123";
+    mysql_conf.user_name = "root";
+    mysql_conf.thread_num = 8;
+    mysql_conf.thread_bind_core = "1, 2-4";
     mock_mysql_service_proxy_ = std::make_shared<MockMysqlServiceProxy>();
     mock_mysql_service_proxy_->SetMockServiceProxyOption(option_);
+    mock_mysql_service_proxy_->SetMysqlConfig(mysql_conf);
   }
 
   void TearDown() {
@@ -143,9 +161,9 @@ mysql> select * from users;
 TEST_F(MysqlServiceProxyTest, Query) {
   auto client_context = GetClientContext();
   MysqlResults<int, std::string> res;
-  mock_mysql_service_proxy_->Query(client_context, res, "select id, username from users where id = ?", 1);
+  Status s = mock_mysql_service_proxy_->Query(client_context, res, "select id, username from users where id = ?", 1);
   auto& res_vec = res.ResultSet();
-  EXPECT_EQ(true, res.OK());
+  EXPECT_EQ(true, s.OK());
   EXPECT_EQ("alice", std::get<1>(res_vec[0]));
 }
 
@@ -418,84 +436,77 @@ TEST_F(MysqlServiceProxyTest, AsyncTransaction) {
   auto client_context = GetClientContext();
   MysqlResults<OnlyExec> exec_res;
   MysqlResults<NativeString> query_res;
-  TransactionHandle handle;
+  TxHandlePtr handle;
   int table_rows = 0;
 
-  //
   mock_mysql_service_proxy_->Query(client_context, query_res, "select * from users");
   table_rows = query_res.ResultSet().size();
 
   // Do two query separately in the same one transaction and the handle will be moved to handle2
-  auto fu = mock_mysql_service_proxy_->AsyncBegin(client_context)
-          .Then([&handle](Future<TransactionHandle>&& f) mutable {
+  auto fut = mock_mysql_service_proxy_->AsyncBegin(client_context)
+          .Then([&handle](Future<TxHandlePtr>&& f) mutable {
             if(f.IsFailed())
               return MakeExceptionFuture<>(f.GetException());
             handle = f.GetValue0();
             return MakeReadyFuture<>();
           });
 
-  future::BlockingGet(std::move(fu));
+  future::BlockingGet(std::move(fut));
 
-  auto fu2 = mock_mysql_service_proxy_
-          ->AsyncQuery<NativeString>(client_context, std::move(handle), "select username from users where username = ?", "alice")
-          .Then([](Future<TransactionHandle, MysqlResults<NativeString>>&& f) mutable {
+  auto fut2 = mock_mysql_service_proxy_
+          ->AsyncQuery<NativeString>(client_context, handle, "select username from users where username = ?", "alice")
+          .Then([](Future<MysqlResults<NativeString>>&& f) mutable {
             if(f.IsFailed())
-              return MakeExceptionFuture<TransactionHandle>(f.GetException());
-            auto t = f.GetValue();
-            auto res = std::move(std::get<1>(t));
+              return MakeExceptionFuture<>(f.GetException());
+            auto res = f.GetValue0();
             EXPECT_EQ("alice", res.ResultSet()[0][0]);
-            return MakeReadyFuture<TransactionHandle>(std::move(std::get<0>(t)));
+            return MakeReadyFuture<>();
           });
 
-  auto fu3 = future::BlockingGet(std::move(fu2));
-  TransactionHandle handle2(fu3.GetValue0());
-  EXPECT_EQ(TransactionHandle::TxState::kStart, handle2.GetState());
+  auto fut3 = future::BlockingGet(std::move(fut2));
+  EXPECT_EQ(TransactionHandle::TxState::kStarted, handle->GetState());
 
   // Do query in "Then Chain" and rollback
   MysqlTime mtime;
   mtime.SetYear(2024).SetMonth(9).SetDay(10);
 
-  auto fu4 = mock_mysql_service_proxy_
-          ->AsyncExecute<OnlyExec>(client_context, std::move(handle2),
+  auto fut4 = mock_mysql_service_proxy_
+          ->AsyncExecute<OnlyExec>(client_context, handle,
                                    "insert into users (username, email, created_at)"
                                    "values (\"jack\", \"jack@abc.com\", ?)", mtime)
-          .Then([this, client_context](Future<TransactionHandle, MysqlResults<OnlyExec>>&& f) {
+          .Then([this, client_context, handle](Future<MysqlResults<OnlyExec>>&& f) {
             if(f.IsFailed())
-              return MakeExceptionFuture<TransactionHandle, MysqlResults<NativeString>>(f.GetException());
-            auto t = f.GetValue();
-            auto res = std::move(std::get<1>(t));
+              return MakeExceptionFuture<MysqlResults<NativeString>>(f.GetException());
+            auto res = f.GetValue0();
             EXPECT_EQ(1, res.GetAffectedRowNum());
-            return mock_mysql_service_proxy_->AsyncQuery<NativeString>(client_context, std::move(std::get<0>(t)),
+            return mock_mysql_service_proxy_->AsyncQuery<NativeString>(client_context, handle,
                                                                        "select username from users where username = ?", "jack");
           })
-          .Then([this, client_context](Future<TransactionHandle, MysqlResults<NativeString>>&& f){
+          .Then([this, client_context, handle](Future<MysqlResults<NativeString>>&& f){
             if(f.IsFailed())
-              return MakeExceptionFuture<TransactionHandle, MysqlResults<OnlyExec>>(f.GetException());
-            auto t = f.GetValue();
-            auto res = std::move(std::get<1>(t));
+              return MakeExceptionFuture<MysqlResults<OnlyExec>>(f.GetException());
+            auto res = f.GetValue0();
             EXPECT_EQ("jack", res.ResultSet()[0][0]);
             return mock_mysql_service_proxy_
-                    ->AsyncQuery<OnlyExec>(client_context, std::move(std::get<0>(t)),
+                    ->AsyncQuery<OnlyExec>(client_context, handle,
                                            "update users set email = ? where username = ? ", "jack@gmail.com", "jack");
           })
-          .Then([this, client_context](Future<TransactionHandle, MysqlResults<OnlyExec>>&& f) {
-            if(f.IsFailed())
-              return MakeExceptionFuture<TransactionHandle>(f.GetException());
-            auto t = f.GetValue();
-            auto res = std::move(std::get<1>(t));
-            EXPECT_EQ(1, res.GetAffectedRowNum());
-            return mock_mysql_service_proxy_
-                    ->AsyncRollback(client_context, std::move(std::get<0>(t)));
-          })
-          .Then([](Future<TransactionHandle>&& f){
+          .Then([this, client_context, handle](Future<MysqlResults<OnlyExec>>&& f) {
             if(f.IsFailed())
               return MakeExceptionFuture<>(f.GetException());
-            auto handle =f.GetValue0();
-            EXPECT_EQ(TransactionHandle::TxState::kRollBacked, handle.GetState());
+            auto res = f.GetValue0();
+            EXPECT_EQ(1, res.GetAffectedRowNum());
+            return mock_mysql_service_proxy_
+                    ->AsyncRollback(client_context, handle);
+          })
+          .Then([](Future<>&& f){
+            if(f.IsFailed())
+              return MakeExceptionFuture<>(f.GetException());
             return MakeReadyFuture<>();
           });
 
-  trpc::future::BlockingGet(std::move(fu4));
+  trpc::future::BlockingGet(std::move(fut4));
+  EXPECT_EQ(TransactionHandle::TxState::kRollBacked, handle->GetState());
 
   // Check rollback
   mock_mysql_service_proxy_->Query(client_context, query_res, "select * from users");
@@ -564,6 +575,26 @@ void DoTx(MysqlServiceProxyPtr proxy, TransactionHandle&& handle, const std::str
 }
 
 TEST_F(MysqlServiceProxyTest, TxConcurrency) {
+ /**
+  * Tx1 (First Transaction)                        Tx2 (Second Transaction)
+  * --------------------------------------------------------------
+  * Begin Transaction                              Begin Transaction
+  * ↓                                              ↓
+  * Update email to "rose@gmail.com"               Wait for signal (condition variable)
+  * ↓                                              ↓
+  * Set `query_executed = true` and notify Tx2     Receive signal, start execution
+  * ↓                                              ↓
+  * Sleep for 500ms (simulate delay)               Attempt to update email to "rose@outlook.com" (blocked)
+  * ↓                                              ↓
+  * Commit Transaction                             Resume after Tx1 commits
+  * ↓                                              ↓
+  *                                                Update email to "rose@outlook.com"
+  * ↓                                              ↓
+  *                                                Commit Transaction
+  * --------------------------------------------------------------
+  */
+
+
   auto client_context = GetClientContext();
   TransactionHandle handle;
   TransactionHandle handle2;
@@ -592,6 +623,8 @@ TEST_F(MysqlServiceProxyTest, TxConcurrency) {
   EXPECT_EQ(query_res.ResultSet().size(), 1);
   EXPECT_EQ(query_res.ResultSet()[0][0], "rose@outlook.com");
 
+
+  // Reset update
   s = mock_mysql_service_proxy_->Query(client_context, exec_res, "update users set email = NULL where username = ?",
                                               "rose");
   EXPECT_EQ(s.OK(), true);

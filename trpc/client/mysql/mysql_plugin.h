@@ -17,6 +17,7 @@
 
 namespace trpc::mysql {
 
+/// @brief Register the codec plugin to the factory.
 bool InitPlugin();
 
 }

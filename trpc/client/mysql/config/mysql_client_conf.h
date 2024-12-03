@@ -45,9 +45,6 @@ struct MysqlClientConf {
   /// Only For MysqlExecutorPoolImpl
   uint32_t num_shard_group{4};
 
-  /// @brief Whether enable auth
-  bool enable{false};
-
   void Display() const;
 };
 

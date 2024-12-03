@@ -12,6 +12,7 @@
 //
 
 #include "mysql_plugin.h"
+
 #include "trpc/codec/codec_manager.h"
 #include "trpc/client/mysql/codec/mysql_client_codec.h"
 

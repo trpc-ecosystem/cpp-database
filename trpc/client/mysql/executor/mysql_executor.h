@@ -71,10 +71,26 @@ class Formatter {
   }
 };
 
+
+struct MysqlConnOption {
+
+  std::string hostname;
+
+  std::string username;
+
+  std::string password;
+
+  std::string database;
+
+  uint16_t port{0};
+
+  std::string char_set{"utf8mb4"};
+};
+
 /// @brief A MySQL connection class that wraps the MySQL C API.
 /// @note This class is not thread-safe. Ensure exclusive ownership during queries.
 class MysqlExecutor : public RefCounted<MysqlExecutor> {
-
+ private:
   template <typename... OutputArgs>
   class QueryHandle {
    public:
@@ -91,7 +107,7 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
     std::unique_ptr<std::vector<unsigned long>> output_length;
     std::unique_ptr<FlagBufferT> null_flag_buffer;
 
-    // Indicate which column are variable-length data. It will be used in MysqlExecutro::FetchTruncatedResults.
+    // Indicate which column are variable-length data. It will be used in MysqlExecutor::FetchTruncatedResults.
     // Only variable-length data column may be truncated.
     std::vector<size_t> dynamic_buffer_index;
 
@@ -108,8 +124,9 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
 
  public:
 
-  MysqlExecutor(const std::string& hostname, const std::string& username, const std::string& password,
-                const std::string& database, uint16_t port = 0, const std::string& char_set = "utf8mb4");
+  MysqlExecutor(const MysqlConnOption& option);
+
+  MysqlExecutor(MysqlConnOption&& option);
 
   ~MysqlExecutor();
 
@@ -147,11 +164,13 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
   template <typename... InputArgs>
   bool Execute(MysqlResults<OnlyExec>& mysql_results, const std::string& query, const InputArgs&... args);
 
+  int GetErrorNumber();
+
   std::string GetErrorMessage();
 
   void RefreshAliveTime();
 
-  uint64_t GetAliveTime();
+  uint64_t GetAliveTime() const;
 
   bool IsConnectionValid();
 
@@ -219,15 +238,7 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
 
   uint64_t executor_id_{0};
 
-  std::string hostname_;
-
-  std::string username_;
-
-  std::string password_;
-
-  std::string database_;
-
-  uint16_t port_;
+  MysqlConnOption option_;
 };
 
 template <typename... OutputArgs>
@@ -262,7 +273,6 @@ template <typename... InputArgs, typename... OutputArgs>
 bool MysqlExecutor::QueryAll(MysqlResults<OutputArgs...>& mysql_results, const std::string& query,
                              const InputArgs&... args) {
   //  static_assert(!MysqlResults<OutputArgs...>::is_only_exec, "MysqlResults<OnlyExec> cannot be used with QueryAll.");
-
   static_assert(MysqlResults<OutputArgs...>::mode != MysqlResultsMode::OnlyExec,
                 "MysqlResults<OnlyExec> cannot be used with QueryAll.");
 
@@ -298,21 +308,21 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   MysqlStatement stmt(mysql_);
 
   if (!stmt.Init(query)) {
-    mysql_results.error_message = stmt.GetErrorMessage();
+    mysql_results.error_message_ = stmt.GetErrorMessage();
     stmt.CloseStatement();
     return false;
   }
 
   if (stmt.GetParamsCount() != sizeof...(InputArgs)) {
-    mysql_results.error_message = util::FormatString("The query params count is {}, but you give {} InputputArgs.",
-                                                     stmt.GetParamsCount(), sizeof...(InputArgs));
+    mysql_results.error_message_ = util::FormatString("The query params count is {}, but you give {} InputputArgs.",
+                                                      stmt.GetParamsCount(), sizeof...(InputArgs));
     stmt.CloseStatement();
     return false;
   }
 
   if (stmt.GetFieldCount() != sizeof...(OutputArgs)) {
-    mysql_results.error_message = util::FormatString("The query field count is {}, but you give {} OutputArgs.",
-                                                     stmt.GetFieldCount(), sizeof...(OutputArgs));
+    mysql_results.error_message_ = util::FormatString("The query field count is {}, but you give {} OutputArgs.",
+                                                      stmt.GetFieldCount(), sizeof...(OutputArgs));
     stmt.CloseStatement();
     return false;
   }
@@ -320,7 +330,7 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   BindInputArgs(input_binds, args...);
 
   if (!stmt.BindParam(input_binds)) {
-    mysql_results.error_message = stmt.GetErrorMessage();
+    mysql_results.error_message_ = stmt.GetErrorMessage();
     stmt.CloseStatement();
     return false;
   }
@@ -334,13 +344,13 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
 
   auto status = ExecuteStatement(*handle.output_binds, stmt);
   if (!status.success) {
-    mysql_results.error_message = status.error_message;
+    mysql_results.error_message_ = status.error_message;
     stmt.CloseStatement();
     return false;
   }
 
   if (!FetchResults(handle)) {
-    mysql_results.error_message = stmt.GetErrorMessage();
+    mysql_results.error_message_ = stmt.GetErrorMessage();
     stmt.CloseStatement();
     return false;
   }
@@ -375,14 +385,14 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<NativeString>& mysql_result, c
   while ((row = mysql_fetch_row(res_ptr)) != nullptr) {
     unsigned long* lengths;
     results.emplace_back();
-    mysql_result.null_flags.emplace_back(num_fields, false);
+    mysql_result.null_flags_.emplace_back(num_fields, false);
     lengths = mysql_fetch_lengths(res_ptr);
 
     for (unsigned long i = 0; i < num_fields; i++) {
       if (row[i])
         results.back().emplace_back(row[i], lengths[i]);
       else {
-        mysql_result.null_flags.back()[i] = true;
+        mysql_result.null_flags_.back()[i] = true;
         results.back().emplace_back("");
       }
     }
@@ -399,7 +409,7 @@ bool MysqlExecutor::FetchResults(MysqlExecutor::QueryHandle<OutputArgs...>& hand
 
   int status = 0;
   auto& results = handle.mysql_results->MutableResultSet();
-  auto& res_null_flags = handle.mysql_results->null_flags;
+  auto& res_null_flags = handle.mysql_results->null_flags_;
   while (true) {
     status = mysql_stmt_fetch(handle.statement->STMTPointer());
     if (status == 1 || status == MYSQL_NO_DATA) break;

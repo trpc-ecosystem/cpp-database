@@ -98,9 +98,9 @@ class MysqlBlob {
 
   bool operator==(const MysqlBlob& other) const;
 
-  const char* data_ptr() const;
+  const char* DataConstPtr() const;
 
-  size_t size() const;
+  size_t Size() const;
 
   std::string_view AsStringView();
 

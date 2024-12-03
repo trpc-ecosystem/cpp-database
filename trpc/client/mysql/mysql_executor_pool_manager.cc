@@ -17,7 +17,8 @@
 namespace trpc {
 namespace mysql {
 
-MysqlExecutorPoolManager::MysqlExecutorPoolManager(MysqlExecutorPoolOption&& option) { option_ = std::move(option); }
+MysqlExecutorPoolManager::MysqlExecutorPoolManager(const MysqlExecutorPoolOption& option) : option_(option) {
+}
 
 MysqlExecutorPool* MysqlExecutorPoolManager::Get(const NodeAddr& node_addr) {
   const int len = 64;
@@ -25,14 +26,14 @@ MysqlExecutorPool* MysqlExecutorPoolManager::Get(const NodeAddr& node_addr) {
   std::snprintf(const_cast<char*>(endpoint.c_str()), len, "%s:%d", node_addr.ip.c_str(), node_addr.port);
 
   MysqlExecutorPool* executor_pool{nullptr};
-  bool ret = execuctor_pools_.Get(endpoint, executor_pool);
+  bool ret = executor_pools_.Get(endpoint, executor_pool);
 
   if (ret) {
     return executor_pool;
   }
 
   MysqlExecutorPool* pool = CreateExecutorPool(node_addr);
-  ret = execuctor_pools_.GetOrInsert(endpoint, pool, executor_pool);
+  ret = executor_pools_.GetOrInsert(endpoint, pool, executor_pool);
   if (!ret) {
     return pool;
   }
@@ -45,12 +46,12 @@ MysqlExecutorPool* MysqlExecutorPoolManager::Get(const NodeAddr& node_addr) {
 
 MysqlExecutorPool* MysqlExecutorPoolManager::CreateExecutorPool(const NodeAddr& node_addr) {
   MysqlExecutorPool* new_pool{nullptr};
-  new_pool = new MysqlExecutorPoolImpl(option_, node_addr);
+  new_pool = new MysqlExecutorPool(option_, node_addr);
   return new_pool;
 }
 
 void MysqlExecutorPoolManager::Stop() {
-  execuctor_pools_.GetAllItems(pools_to_destroy_);
+  executor_pools_.GetAllItems(pools_to_destroy_);
 
   for(auto& [key, pool] : pools_to_destroy_)
     pool->Stop();
@@ -63,7 +64,7 @@ void MysqlExecutorPoolManager::Destroy() {
     pool = nullptr;
   }
 
-  execuctor_pools_.Reclaim();
+  executor_pools_.Reclaim();
   pools_to_destroy_.clear();
 }
 

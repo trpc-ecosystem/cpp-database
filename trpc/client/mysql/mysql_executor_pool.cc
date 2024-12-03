@@ -15,27 +15,17 @@
 #include <stdexcept>
 #include <thread>
 #include "trpc/client/mysql/executor/mysql_executor.h"
-#include "trpc/client/mysql/mysql_service_config.h"
 
 namespace trpc {
 namespace mysql {
 
-MysqlExecutorPoolImpl::MysqlExecutorPoolImpl(const MysqlExecutorPoolOption& option, const NodeAddr& node_addr)
-    : m_ip_(node_addr.ip),
-      m_port_(node_addr.port),
-      m_user_(option.user_name),
-      m_passwd_(option.password),
-      m_db_name_(option.dbname),
-      m_char_set_(option.char_set),
-      num_shard_group_(option.num_shard_group),
-      max_conn_(option.max_size),
-      max_idle_time_(option.max_idle_time){
-
-  executor_shards_ = std::make_unique<Shard[]>(num_shard_group_);
-  max_num_per_shard_ = std::ceil(max_conn_ / num_shard_group_);
+MysqlExecutorPool::MysqlExecutorPool(const MysqlExecutorPoolOption& option, const NodeAddr& node_addr)
+    : pool_option_(option), target_((node_addr)){
+  executor_shards_ = std::make_unique<Shard[]>(option.num_shard_group);
+  max_num_per_shard_ = std::ceil(pool_option_.max_size / option.num_shard_group);
 }
 
-RefPtr<MysqlExecutor> MysqlExecutorPoolImpl::GetOrCreate() {
+RefPtr<MysqlExecutor> MysqlExecutorPool::GetOrCreate() {
   RefPtr<MysqlExecutor> executor{nullptr};
   RefPtr<MysqlExecutor> idle_executor{nullptr};
 
@@ -43,7 +33,7 @@ RefPtr<MysqlExecutor> MysqlExecutorPoolImpl::GetOrCreate() {
   int retry_num = 3;
 
   while (retry_num > 0) {
-    auto& shard = executor_shards_[shard_id % num_shard_group_];
+    auto& shard = executor_shards_[shard_id % pool_option_.num_shard_group];
 
     {
       std::scoped_lock _(shard.lock);
@@ -84,24 +74,32 @@ RefPtr<MysqlExecutor> MysqlExecutorPoolImpl::GetOrCreate() {
   return nullptr;
 }
 
-RefPtr<MysqlExecutor> MysqlExecutorPoolImpl::CreateExecutor(uint32_t shard_id) {
+RefPtr<MysqlExecutor> MysqlExecutorPool::CreateExecutor(uint32_t shard_id) {
   uint64_t executor_id = static_cast<uint64_t>(shard_id) << 32;
   executor_id |= executor_id_gen_.fetch_add(1, std::memory_order_relaxed);
 
-  auto executor = MakeRefCounted<MysqlExecutor>(m_ip_, m_user_, m_passwd_, m_db_name_, m_port_, m_char_set_);
+  MysqlConnOption conn_option;
+  conn_option.hostname = target_.ip;
+  conn_option.port = target_.port;
+  conn_option.username = pool_option_.username;
+  conn_option.database = pool_option_.dbname;
+  conn_option.password = pool_option_.password;
+  conn_option.char_set = pool_option_.char_set;
+
+  auto executor = MakeRefCounted<MysqlExecutor>(conn_option);
   executor->SetExecutorId(executor_id);
   return executor;
 }
 
-void MysqlExecutorPoolImpl::Reclaim(int ret, RefPtr<MysqlExecutor>&& executor) {
+void MysqlExecutorPool::Reclaim(int ret, RefPtr<MysqlExecutor>&& executor) {
 
   if(ret == 0) {
     uint32_t shard_id = (executor->GetExecutorId() >> 32);
-    auto& shard = executor_shards_[shard_id % num_shard_group_];
+    auto& shard = executor_shards_[shard_id % pool_option_.num_shard_group];
 
     std::scoped_lock _(shard.lock);
     if ((shard.mysql_executors.size() <= max_num_per_shard_) &&
-        (executor_num_.load(std::memory_order_relaxed) <= max_conn_)) {
+        (executor_num_.load(std::memory_order_relaxed) <= pool_option_.max_size)) {
       executor->RefreshAliveTime();
       shard.mysql_executors.push_back(std::move(executor));
       return;
@@ -112,8 +110,8 @@ void MysqlExecutorPoolImpl::Reclaim(int ret, RefPtr<MysqlExecutor>&& executor) {
   executor->Close();
 }
 
-void MysqlExecutorPoolImpl::Stop() {
-  for (uint32_t i = 0; i != num_shard_group_; ++i) {
+void MysqlExecutorPool::Stop() {
+  for (uint32_t i = 0; i != pool_option_.num_shard_group; ++i) {
     auto&& shard = executor_shards_[i];
 
     std::list<RefPtr<MysqlExecutor>> mysql_executors;
@@ -129,8 +127,8 @@ void MysqlExecutorPoolImpl::Stop() {
   }
 }
 
-void MysqlExecutorPoolImpl::Destroy() {
-  for (uint32_t i = 0; i != num_shard_group_; ++i) {
+void MysqlExecutorPool::Destroy() {
+  for (uint32_t i = 0; i != pool_option_.num_shard_group; ++i) {
     auto&& shard = executor_shards_[i];
 
     std::list<RefPtr<MysqlExecutor>> mysql_executors;
@@ -143,14 +141,14 @@ void MysqlExecutorPoolImpl::Destroy() {
   }
 }
 
-RefPtr<MysqlExecutor> MysqlExecutorPoolImpl::GetExecutor() {
+RefPtr<MysqlExecutor> MysqlExecutorPool::GetExecutor() {
   return GetOrCreate();
 }
 
-bool MysqlExecutorPoolImpl::IsIdleTimeout(RefPtr<MysqlExecutor> executor) {
+bool MysqlExecutorPool::IsIdleTimeout(RefPtr<MysqlExecutor> executor) {
   if (executor != nullptr) {
-    if (max_idle_time_ == 0 ||
-        executor->GetAliveTime() < max_idle_time_) {
+    if (pool_option_.max_idle_time == 0 ||
+        executor->GetAliveTime() < pool_option_.max_idle_time) {
       return false;
     }
     return true;

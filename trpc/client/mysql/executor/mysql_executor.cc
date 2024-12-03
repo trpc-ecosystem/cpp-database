@@ -17,22 +17,18 @@
 namespace trpc::mysql {
 
 std::mutex MysqlExecutor::mysql_mutex;
+constexpr unsigned int TRPC_MYSQL_API_TIMEOUT = 5;
 
-MysqlExecutor::MysqlExecutor(const std::string& hostname, const std::string& username, const std::string& password,
-                             const std::string& database, uint16_t port, const std::string& char_set)
+MysqlExecutor::MysqlExecutor(const MysqlConnOption& option)
     : is_connected(false),
-      hostname_(hostname),
-      username_(username),
-      password_(password),
-      database_(database),
-      port_(port) {
+      option_(option) {
   {
     std::lock_guard<std::mutex> lock(mysql_mutex);
     mysql_ = mysql_init(nullptr);
   }
-  mysql_set_character_set(mysql_, char_set.c_str());
+  mysql_set_character_set(mysql_, option_.char_set.c_str());
 
-  unsigned int timeout = 5;
+  unsigned int timeout = TRPC_MYSQL_API_TIMEOUT;
   mysql_options(mysql_, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
   mysql_options(mysql_, MYSQL_OPT_READ_TIMEOUT, &timeout);
   mysql_options(mysql_, MYSQL_OPT_WRITE_TIMEOUT, &timeout);
@@ -49,8 +45,9 @@ bool MysqlExecutor::Connect() {
     mysql_ = mysql_init(nullptr);
   }
 
-  MYSQL* ret = mysql_real_connect(mysql_, hostname_.c_str(), username_.c_str(), password_.c_str(), database_.c_str(),
-                                  port_, nullptr, 0);
+  MYSQL* ret = mysql_real_connect(mysql_, option_.hostname.c_str(), option_.username.c_str(),
+                                  option_.password.c_str(), option_.database.c_str(),
+                                  option_.port, nullptr, 0);
 
   if (nullptr == ret) {
     mysql_close(mysql_);
@@ -103,7 +100,7 @@ ExecuteStatus MysqlExecutor::ExecuteStatement(MysqlStatement& statement) {
   return ExecuteStatus(true);
 }
 
-uint64_t MysqlExecutor::GetAliveTime() {
+uint64_t MysqlExecutor::GetAliveTime() const {
   uint64_t now = trpc::GetSteadyMilliSeconds();
   uint64_t alive_time = now - m_alivetime;
   return alive_time;
@@ -158,11 +155,15 @@ uint64_t MysqlExecutor::GetExecutorId() const {
 }
 
 std::string MysqlExecutor::GetIp() const {
-  return hostname_;
+  return option_.hostname;
 }
 
 uint16_t MysqlExecutor::GetPort() const {
-  return port_;
+  return option_.port;
+}
+
+int MysqlExecutor::GetErrorNumber() {
+  return mysql_errno(mysql_);
 }
 
 std::string MysqlExecutor::GetErrorMessage() {
@@ -177,5 +178,7 @@ bool MysqlExecutor::Autocommit(bool mode) {
   auto_commit_ = mode;
   return true;
 }
+
+
 
 }  // namespace trpc::mysql

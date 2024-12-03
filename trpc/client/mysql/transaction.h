@@ -20,7 +20,8 @@ namespace trpc::mysql {
 class TransactionHandle : public RefCounted<TransactionHandle>{
 
  public:
-  enum class TxState {kNotInited, kStart, kRollBacked, kCommitted, kInValid};
+  /// @note When the handle has been moved, it's state would be set to kInValid
+  enum class TxState {kNotInited, kStarted, kRollBacked, kCommitted, kInValid};
 
   explicit TransactionHandle(RefPtr<MysqlExecutor> &&executor) : executor_(std::move(executor)) {}
 

@@ -29,8 +29,6 @@ struct convert<trpc::mysql::MysqlClientConf> {
     node["thread_num"] = mysql_conf.thread_num;
     node["thread_bind_core"] = mysql_conf.thread_bind_core;
     node["num_shard_group"] = mysql_conf.num_shard_group;
-    node["enable"] = mysql_conf.enable;
-
     return node;
   }
 
@@ -55,9 +53,6 @@ struct convert<trpc::mysql::MysqlClientConf> {
     }
     if (node["num_shard_group"]) {
       mysql_conf.num_shard_group = node["num_shard_group"].as<uint32_t>();
-    }
-    if (node["enable"]) {
-      mysql_conf.enable = node["enable"].as<bool>();
     }
 
     return true;

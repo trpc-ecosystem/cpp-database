@@ -128,6 +128,8 @@ class MysqlResults {
 
   const std::string& GetErrorMessage();
 
+  int GetErrorNumber() const;
+
  private:
   void SetRawMysqlRes(MYSQL_RES* res);
 
@@ -141,18 +143,22 @@ class MysqlResults {
 
   std::string& SetErrorMessage(std::string&& message);
 
+  int SetErrorNumber(int error_number);
+
  private:
   MysqlResultsOption option_;
 
-  ResultSetType result_set;
+  ResultSetType result_set_;
 
   std::vector<std::string> fields_name_;
 
-  std::vector<std::vector<uint8_t>> null_flags;
+  std::vector<std::vector<uint8_t>> null_flags_;
 
-  std::string error_message;
+  int error_number_{0};
 
-  size_t affected_rows;
+  std::string error_message_;
+
+  size_t affected_rows_;
 
   bool has_value_;
 
@@ -182,6 +188,9 @@ bool MysqlResults<Args...>::CheckFieldsType(MYSQL_RES* res) {
 
   unsigned long i = 0;
   std::vector<unsigned long> failed_index;
+
+  // There is no need to check the length of fields_meta and Args
+  // because they should have been checked in the caller(e.g. QueryAllInternal)
   ((OutputTypeValid<Args>(fields_meta[i].type) ? (void)i++ : failed_index.push_back(i++)), ...);
 
   if(!failed_index.empty()) {
@@ -190,7 +199,7 @@ bool MysqlResults<Args...>::CheckFieldsType(MYSQL_RES* res) {
     for(i = 1; i < failed_index.size(); i++)
       error.append(", ").append(fields_meta[failed_index[i]].name);
     error.append(").");
-    error_message.append(error);
+    error_message_.append(error);
     return false;
   }
   return true;
@@ -200,11 +209,11 @@ template <typename... Args>
 MysqlResults<Args...>& MysqlResults<Args...>::operator=(MysqlResults&& other) noexcept {
   if (this != &other) {
     option_ = std::move(other.option_);
-    result_set = std::move(other.result_set);
+    result_set_ = std::move(other.result_set_);
     fields_name_ = std::move(other.fields_name_);
-    null_flags = std::move(other.null_flags);
-    error_message = std::move(other.error_message);
-    affected_rows = other.affected_rows;
+    null_flags_ = std::move(other.null_flags_);
+    error_message_ = std::move(other.error_message_);
+    affected_rows_ = other.affected_rows_;
     has_value_ = other.has_value_;
     mysql_res_ = other.mysql_res_;
 
@@ -216,11 +225,11 @@ MysqlResults<Args...>& MysqlResults<Args...>::operator=(MysqlResults&& other) no
 template <typename... Args>
 MysqlResults<Args...>::MysqlResults(MysqlResults&& other) noexcept
     : option_(std::move(other.option_)),
-      result_set(std::move(other.result_set)),
+      result_set_(std::move(other.result_set_)),
       fields_name_(std::move(other.fields_name_)),
-      null_flags(std::move(other.null_flags)),
-      error_message(std::move(other.error_message)),
-      affected_rows(other.affected_rows),
+      null_flags_(std::move(other.null_flags_)),
+      error_message_(std::move(other.error_message_)),
+      affected_rows_(other.affected_rows_),
       has_value_(other.has_value_),
       mysql_res_(other.mysql_res_) {
   other.mysql_res_ = nullptr;
@@ -241,23 +250,33 @@ MysqlResults<Args...>::~MysqlResults() {
 
 template <typename... Args>
 std::string& MysqlResults<Args...>::SetErrorMessage(std::string&& message) {
-  error_message = std::move(message);
-  return error_message;
+  error_message_ = std::move(message);
+  return error_message_;
 }
 
 template <typename... Args>
 std::string& MysqlResults<Args...>::SetErrorMessage(const std::string& message) {
-  error_message = message;
-  return error_message;
+  error_message_ = message;
+  return error_message_;
 }
 
 template <typename... Args>
 const std::string& MysqlResults<Args...>::GetErrorMessage() {
-  return error_message;
+  return error_message_;
+}
+
+template<typename... Args>
+int MysqlResults<Args...>::GetErrorNumber() const {
+  return error_number_;
+}
+
+template<typename... Args>
+int MysqlResults<Args...>::SetErrorNumber(int error_number) {
+  return error_number_ = error_number;
 }
 
 template <typename... Args>
-MysqlResults<Args...>::MysqlResults() : affected_rows(0), has_value_(false), mysql_res_(nullptr) {
+MysqlResults<Args...>::MysqlResults() : affected_rows_(0), has_value_(false), mysql_res_(nullptr) {
   // dummy
 }
 
@@ -268,12 +287,12 @@ MysqlResults<Args...>::MysqlResults(const MysqlResultsOption& option) : MysqlRes
 
 template <typename... Args>
 auto& MysqlResults<Args...>::MutableResultSet() {
-  return result_set;
+  return result_set_;
 }
 
 template <typename... Args>
 const auto& MysqlResults<Args...>::ResultSet() const {
-  return result_set;
+  return result_set_;
 }
 
 template <typename... Args>
@@ -284,13 +303,13 @@ bool MysqlResults<Args...>::GetResultSet(T& res) {
 
   if constexpr (mode == MysqlResultsMode::NativeString) {
     res.clear();
-    for (const auto& row : result_set) {
+    for (const auto& row : result_set_) {
       res.emplace_back(row.begin(), row.end());
     }
 
     return true;
   } else {
-    res = std::move(result_set);
+    res = std::move(result_set_);
     has_value_ = false;
     return true;
   }
@@ -298,7 +317,7 @@ bool MysqlResults<Args...>::GetResultSet(T& res) {
 
 template <typename... Args>
 const std::vector<std::vector<uint8_t>>& MysqlResults<Args...>::GetNullFlag() {
-  return null_flags;
+  return null_flags_;
 }
 
 template <typename... Args>
@@ -308,33 +327,33 @@ const MysqlResultsOption& MysqlResults<Args...>::GetOption() {
 
 template <typename... Args>
 size_t MysqlResults<Args...>::GetAffectedRowNum() const {
-  return affected_rows;
+  return affected_rows_;
 }
 
 template <typename... Args>
 size_t MysqlResults<Args...>::SetAffectedRows(size_t n_rows) {
-  affected_rows = n_rows;
-  return affected_rows;
+  affected_rows_ = n_rows;
+  return affected_rows_;
 }
 
 template <typename... Args>
 bool MysqlResults<Args...>::IsValueNull(size_t row_index, size_t col_index) const {
-  return null_flags[row_index][col_index];
+  return null_flags_[row_index][col_index];
 }
 
 
 template <typename... Args>
 bool MysqlResults<Args...>::OK() const {
-  return error_message.empty();
+  return error_message_.empty();
 }
 
 template <typename... Args>
 void MysqlResults<Args...>::Clear() {
-  null_flags.clear();
-  error_message.clear();
+  null_flags_.clear();
+  error_message_.clear();
   fields_name_.clear();
   has_value_ = false;
-  affected_rows = 0;
+  affected_rows_ = 0;
   MutableResultSet().clear();
 
   if (mysql_res_) {
