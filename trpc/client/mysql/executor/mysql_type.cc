@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -20,108 +20,97 @@ namespace trpc::mysql {
 
 
 MysqlTime::MysqlTime() {
-  mt.year = 2024;
-  mt.month = 1;
-  mt.day = 1;
-  mt.hour = 0;
-  mt.minute = 0;
-  mt.second = 0;
-  mt.second_part = 0;
-  mt.time_type = MYSQL_TIMESTAMP_DATETIME;
-  mt.neg = 0;
+  mt_.year = 2024;
+  mt_.month = 1;
+  mt_.day = 1;
+  mt_.hour = 0;
+  mt_.minute = 0;
+  mt_.second = 0;
+  mt_.second_part = 0;
+  mt_.time_type = MYSQL_TIMESTAMP_DATETIME;
+  mt_.neg = 0;
 }
 
 MysqlTime::MysqlTime(MYSQL_TIME my_time) {
-  mt = my_time;
+  mt_ = my_time;
 }
 
 
 MysqlTime &MysqlTime::SetYear(unsigned int year) {
-  mt.year = year;
+  mt_.year = year;
   return *this;
 }
 
 MysqlTime &MysqlTime::SetMonth(unsigned int month) {
   if(month > 0 && month <= 12)
-    mt.month = month;
+    mt_.month = month;
   return *this;
 }
 
 MysqlTime &MysqlTime::SetDay(unsigned int day) {
-  mt.day = day;
+  mt_.day = day;
   return *this;
 }
 
 MysqlTime &MysqlTime::SetHour(unsigned int hour) {
   if(hour <= 24)
-    mt.hour = hour;
+    mt_.hour = hour;
   return *this;
 }
 
 MysqlTime &MysqlTime::SetMinute(unsigned int minute) {
   if(minute <= 60)
-    mt.minute = minute;
+    mt_.minute = minute;
   return *this;
 }
 
 MysqlTime &MysqlTime::SetSecond(unsigned int second) {
   if(second <= 60)
-    mt.second = second;
+    mt_.second = second;
   return *this;
 }
 
 MysqlTime &MysqlTime::SetSecondPart(unsigned long second_part) {
-  mt.second_part = second_part;
+  mt_.second_part = second_part;
   return *this;
 }
 
 
 MysqlTime &MysqlTime::SetTimeType(enum_mysql_timestamp_type time_type) {
-  mt.time_type = time_type;
+  mt_.time_type = time_type;
   return *this;
 }
 
-unsigned int MysqlTime::GetYear() const { return mt.year; }
+unsigned int MysqlTime::GetYear() const { return mt_.year; }
 
-unsigned int MysqlTime::GetMonth() const { return mt.month; }
+unsigned int MysqlTime::GetMonth() const { return mt_.month; }
 
-unsigned int MysqlTime::GetDay() const { return mt.day; }
+unsigned int MysqlTime::GetDay() const { return mt_.day; }
 
-unsigned int MysqlTime::GetHour() const { return mt.hour; }
+unsigned int MysqlTime::GetHour() const { return mt_.hour; }
 
-unsigned int MysqlTime::GetMinute() const { return mt.minute; }
+unsigned int MysqlTime::GetMinute() const { return mt_.minute; }
 
-unsigned int MysqlTime::GetSecond() const { return mt.second; }
+unsigned int MysqlTime::GetSecond() const { return mt_.second; }
 
-unsigned long MysqlTime::SetSecondPart() const { return mt.second_part; }
+unsigned long MysqlTime::SetSecondPart() const { return mt_.second_part; }
 
-enum_mysql_timestamp_type MysqlTime::GetTimeType() const { return mt.time_type; }
-
-//std::string MysqlTime::ToString() const {
-//  std::ostringstream oss;
-//  oss << std::setw(4) << std::setfill('0') << mt.year << '-'
-//      << std::setw(2) << std::setfill('0') << mt.month << '-'
-//      << std::setw(2) << std::setfill('0') << mt.day << ' '
-//      << std::setw(2) << std::setfill('0') << mt.hour << ':'
-//      << std::setw(2) << std::setfill('0') << mt.minute << ':'
-//      << std::setw(2) << std::setfill('0') << mt.second;
-//  return oss.str();
-//}
+enum_mysql_timestamp_type MysqlTime::GetTimeType() const { return mt_.time_type; }
 
 std::string MysqlTime::ToString() const {
-  return time::StringFormat("%04d-%02d-%02d %02d:%02d:%02d", mt.year, mt.month,
-                      mt.day, mt.hour, mt.minute, mt.second);
+  return time::StringFormat("%04d-%02d-%02d %02d:%02d:%02d", mt_.year, mt_.month,
+                            mt_.day, mt_.hour, mt_.minute, mt_.second);
 }
 
 void MysqlTime::FromString(const std::string &timeStr) {
   std::istringstream iss(timeStr);
   char delimiter;
-  iss >> mt.year >> delimiter >> mt.month >> delimiter >> mt.day
-      >> mt.hour >> delimiter >> mt.minute >> delimiter >> mt.second;
+  iss >> mt_.year >> delimiter >> mt_.month >> delimiter >> mt_.day
+      >> mt_.hour >> delimiter >> mt_.minute >> delimiter >> mt_.second;
 }
 
 const char *MysqlTime::DataConstPtr() const {
-  return reinterpret_cast<const char *>(&mt);
+  return reinterpret_cast<const char *>(&mt_);
 }
 
 

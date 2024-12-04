@@ -6,8 +6,8 @@
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -43,14 +43,15 @@ class TransactionHandle : public RefCounted<TransactionHandle>{
   }
 
   TransactionHandle& operator=(const TransactionHandle& other) = delete;
+
   TransactionHandle(const TransactionHandle& other) = delete;
 
-
-
   ~TransactionHandle() {
-    // usually executor_ would be nullptr
-    if(executor_)
+    // usually executor_ would be nullptr(be reclaimed)
+    if(executor_) {
+      TRPC_FMT_ERROR("TransactionHandle destructed but executor is not reclaimed.");
       executor_->Close();
+    }
     state_ = TxState::kInValid;
   }
 

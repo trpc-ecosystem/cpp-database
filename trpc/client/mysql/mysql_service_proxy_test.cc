@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -386,9 +386,9 @@ TEST_F(MysqlServiceProxyTest, ConcurrentAsyncQueryWithFutures) {
 }
 
 
-TEST_F(MysqlServiceProxyTest, Transaction) {
+TEST_F(MysqlServiceProxyTest, TransactionRollback) {
   auto client_context = GetClientContext();
-  TransactionHandle handle;
+  TxHandlePtr handle = nullptr;
   MysqlResults<OnlyExec> exec_res;
   MysqlResults<NativeString> query_res;
   MysqlTime mtime;
@@ -411,7 +411,7 @@ TEST_F(MysqlServiceProxyTest, Transaction) {
 
 TEST_F(MysqlServiceProxyTest, TransactionNoCommit) {
   auto client_context = GetClientContext();
-  TransactionHandle handle;
+  TxHandlePtr handle = nullptr;
   MysqlResults<OnlyExec> exec_res;
   MysqlResults<NativeString> query_res;
   MysqlTime mtime;
@@ -427,6 +427,13 @@ TEST_F(MysqlServiceProxyTest, TransactionNoCommit) {
   mock_mysql_service_proxy_->Query(client_context, handle, query_res, "select * from users where username = ?", "jack");
   EXPECT_EQ(1, query_res.ResultSet().size());
 
+
+  // simulate connection lost
+  handle->GetExecutor()->Close();
+
+  s = mock_mysql_service_proxy_->Query(client_context, handle, query_res, "select * from users where username = ?", "jack");
+  EXPECT_FALSE(s.OK());
+
   mock_mysql_service_proxy_->Query(client_context, query_res, "select * from users where username = ?", "jack");
   EXPECT_EQ(0, query_res.ResultSet().size());
 }
@@ -437,7 +444,7 @@ TEST_F(MysqlServiceProxyTest, AsyncTransaction) {
   MysqlResults<OnlyExec> exec_res;
   MysqlResults<NativeString> query_res;
   TxHandlePtr handle;
-  int table_rows = 0;
+  size_t table_rows = 0;
 
   mock_mysql_service_proxy_->Query(client_context, query_res, "select * from users");
   table_rows = query_res.ResultSet().size();
@@ -523,7 +530,7 @@ std::condition_variable tx_cv;
 bool query_executed = false;
 bool committed = false;
 
-void DoTx(MysqlServiceProxyPtr proxy, TransactionHandle&& handle, const std::string& new_value, bool first) {
+void DoTx(MysqlServiceProxyPtr proxy, const TxHandlePtr& handle, const std::string& new_value, bool first) {
   auto ctx = MakeClientContext(proxy);
   MysqlResults<OnlyExec> exec_res;
   ctx->SetTimeout(200);
@@ -596,8 +603,8 @@ TEST_F(MysqlServiceProxyTest, TxConcurrency) {
 
 
   auto client_context = GetClientContext();
-  TransactionHandle handle;
-  TransactionHandle handle2;
+  TxHandlePtr handle = nullptr;
+  TxHandlePtr handle2 = nullptr;
   MysqlResults<OnlyExec> exec_res;
   MysqlResults<OnlyExec> exec_res2;
 
@@ -607,8 +614,8 @@ TEST_F(MysqlServiceProxyTest, TxConcurrency) {
   EXPECT_EQ(s1.OK(), true);
   EXPECT_EQ(s2.OK(), true);
 
-  std::thread t1(DoTx, mock_mysql_service_proxy_, std::move(handle), "rose@gmail.com", true);
-  std::thread t2(DoTx, mock_mysql_service_proxy_, std::move(handle2), "rose@outlook.com", false);
+  std::thread t1(DoTx, mock_mysql_service_proxy_, handle, "rose@gmail.com", true);
+  std::thread t2(DoTx, mock_mysql_service_proxy_, handle2, "rose@outlook.com", false);
 
   t1.join();
   t2.join();

@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -21,12 +21,15 @@
 #include <type_traits>
 #include <variant>
 #include <vector>
+#include "trpc/common/status.h"
 #include "trpc/client/mysql/executor/mysql_binder.h"
 #include "trpc/client/mysql/executor/mysql_results.h"
 #include "trpc/client/mysql/executor/mysql_statement.h"
 #include "trpc/util/ref_ptr.h"
 #include "trpc/util/string_util.h"
 #include "trpc/util/time.h"
+#include "trpc/util/log/logging.h"
+#include "trpc/client/mysql/mysql_error_number.h"
 
 namespace trpc::mysql {
 
@@ -164,15 +167,25 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
   template <typename... InputArgs>
   bool Execute(MysqlResults<OnlyExec>& mysql_results, const std::string& query, const InputArgs&... args);
 
+  /// @brief Get the error from MYSQL* mysql_.
+  /// @note If use prepared statement (e.g. template <typename... InputArgs, typename... OutputArgs>
+  ///  bool QueryAllInternal), the error should be get from mysql_stmt.
   int GetErrorNumber();
 
+  /// @brief Get the error from MYSQL* mysql_.
+  /// @note If use prepared statement (e.g. template <typename... InputArgs, typename... OutputArgs>
+  ///  bool QueryAllInternal), the error should be get from mysql_stmt.
   std::string GetErrorMessage();
 
   void RefreshAliveTime();
 
   uint64_t GetAliveTime() const;
 
-  bool IsConnectionValid();
+  /// @brief Ping the MySQL server.
+  bool CheckAlive();
+
+  /// @brief Just return the member is_connected.
+  bool IsConnected();
 
   bool Reconnect();
 
@@ -213,9 +226,9 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
   template <typename... OutputArgs>
   void BindOutputs(MysqlExecutor::QueryHandle<OutputArgs...>& handle);
 
-  ExecuteStatus ExecuteStatement(std::vector<MYSQL_BIND>& output_binds, MysqlStatement& statement);
+  Status ExecuteStatement(std::vector<MYSQL_BIND>& output_binds, MysqlStatement& statement);
 
-  ExecuteStatus ExecuteStatement(MysqlStatement& statement);
+  Status ExecuteStatement(MysqlStatement& statement);
 
   template <typename... OutputArgs>
   bool FetchResults(MysqlExecutor::QueryHandle<OutputArgs...>& handle);
@@ -230,11 +243,12 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
 
   bool is_connected;
 
+  // by-default: https://dev.mysql.com/doc/refman/8.4/en/innodb-autocommit-commit-rollback.html
   bool auto_commit_{true};
 
   MYSQL* mysql_;
 
-  uint64_t m_alivetime;
+  uint64_t m_alivetime{0};
 
   uint64_t executor_id_{0};
 
@@ -272,7 +286,6 @@ void MysqlExecutor::QueryHandle<OutputArgs...>::ResizeOutputBuffer() {
 template <typename... InputArgs, typename... OutputArgs>
 bool MysqlExecutor::QueryAll(MysqlResults<OutputArgs...>& mysql_results, const std::string& query,
                              const InputArgs&... args) {
-  //  static_assert(!MysqlResults<OutputArgs...>::is_only_exec, "MysqlResults<OnlyExec> cannot be used with QueryAll.");
   static_assert(MysqlResults<OutputArgs...>::mode != MysqlResultsMode::OnlyExec,
                 "MysqlResults<OnlyExec> cannot be used with QueryAll.");
 
@@ -308,21 +321,24 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   MysqlStatement stmt(mysql_);
 
   if (!stmt.Init(query)) {
-    mysql_results.error_message_ = stmt.GetErrorMessage();
+    mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return false;
   }
 
   if (stmt.GetParamsCount() != sizeof...(InputArgs)) {
-    mysql_results.error_message_ = util::FormatString("The query params count is {}, but you give {} InputputArgs.",
-                                                      stmt.GetParamsCount(), sizeof...(InputArgs));
+    mysql_results.SetErrorMessage(util::FormatString("The query params count is {}, but you give {} InputputArgs.",
+                                                      stmt.GetParamsCount(), sizeof...(InputArgs)));
+    mysql_results.SetErrorNumber(TrpcMysqlRetCode::TRPC_MYSQL_STMT_PARAMS_ERROR);
     stmt.CloseStatement();
     return false;
   }
 
   if (stmt.GetFieldCount() != sizeof...(OutputArgs)) {
-    mysql_results.error_message_ = util::FormatString("The query field count is {}, but you give {} OutputArgs.",
-                                                      stmt.GetFieldCount(), sizeof...(OutputArgs));
+    mysql_results.SetErrorMessage(util::FormatString("The query field count is {}, but you give {} OutputArgs.",
+                                                      stmt.GetFieldCount(), sizeof...(OutputArgs)));
+    mysql_results.SetErrorNumber(TrpcMysqlRetCode::TRPC_MYSQL_STMT_PARAMS_ERROR);
     stmt.CloseStatement();
     return false;
   }
@@ -330,7 +346,8 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   BindInputArgs(input_binds, args...);
 
   if (!stmt.BindParam(input_binds)) {
-    mysql_results.error_message_ = stmt.GetErrorMessage();
+    mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return false;
   }
@@ -342,15 +359,17 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
     handle.output_binds->at(i).length = &handle.output_length->at(i);
   }
 
-  auto status = ExecuteStatement(*handle.output_binds, stmt);
-  if (!status.success) {
-    mysql_results.error_message_ = status.error_message;
+  Status s = ExecuteStatement(*handle.output_binds, stmt);
+  if (!s.OK()) {
+    mysql_results.SetErrorMessage(s.ErrorMessage());
+    mysql_results.SetErrorNumber(s.GetFrameworkRetCode());
     stmt.CloseStatement();
     return false;
   }
 
   if (!FetchResults(handle)) {
-    mysql_results.error_message_ = stmt.GetErrorMessage();
+    mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return false;
   }
@@ -371,12 +390,14 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<NativeString>& mysql_result, c
 
   if (mysql_real_query(mysql_, query_str.c_str(), query_str.length())) {
     mysql_result.SetErrorMessage(GetErrorMessage());
+    mysql_result.SetErrorNumber(GetErrorNumber());
     return false;
   }
 
   MYSQL_RES* res_ptr = mysql_store_result(mysql_);
   if (res_ptr == nullptr) {
     mysql_result.SetErrorMessage(GetErrorMessage());
+    mysql_result.SetErrorNumber(GetErrorNumber());
     return false;
   }
 
@@ -458,6 +479,7 @@ size_t MysqlExecutor::ExecuteInternal(const std::string& query, MysqlResults<Onl
 
   if (!stmt.Init(query)) {
     mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return 0;
   }
@@ -465,13 +487,15 @@ size_t MysqlExecutor::ExecuteInternal(const std::string& query, MysqlResults<Onl
 
   if (!stmt.BindParam(input_binds)) {
     mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return 0;
   }
 
-  auto status = ExecuteStatement(stmt);
-  if (!status.success) {
-    mysql_results.SetErrorMessage(status.error_message);
+  Status s = ExecuteStatement(stmt);
+  if (!s.OK()) {
+    mysql_results.SetErrorMessage(s.ErrorMessage());
+    mysql_results.SetErrorNumber(s.GetFrameworkRetCode());
     stmt.CloseStatement();
     return 0;
   }

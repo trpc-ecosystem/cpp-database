@@ -2,14 +2,15 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
+
 #include "trpc/client/mysql/mysql_service_proxy.h"
 
 #include <iostream>
@@ -74,7 +75,7 @@ void MysqlServiceProxy::Stop() {
   pool_manager_->Stop();
 }
 
-Status MysqlServiceProxy::Begin(const ClientContextPtr& context, TransactionHandle &handle) {
+Status MysqlServiceProxy::Begin(const ClientContextPtr& context, TxHandlePtr& handle) {
 
 
   FillClientContext(context);
@@ -85,12 +86,6 @@ Status MysqlServiceProxy::Begin(const ClientContextPtr& context, TransactionHand
     return context->GetStatus();
   }
 
-  if(handle.GetState() != TransactionHandle::TxState::kNotInited) {
-    TRPC_FMT_ERROR("service name:{}, invalid handle state.");
-    context->SetStatus(Status(TrpcMysqlRetCode::TRPC_MYSQL_INVALID_HANDLE, "Invalid handle."));
-    RunFilters(FilterPoint::CLIENT_POST_RPC_INVOKE, context);
-    return context->GetStatus();
-  }
 
   MysqlResults<OnlyExec> res;
   NodeAddr node_addr;
@@ -106,9 +101,7 @@ Status MysqlServiceProxy::Begin(const ClientContextPtr& context, TransactionHand
       context->SetStatus(temp_ctx->GetStatus());
       return context->GetStatus();
     }
-
     node_addr = temp_ctx->GetNodeAddr();
-
   } else {
     node_addr = context->GetNodeAddr();
   }
@@ -117,10 +110,12 @@ Status MysqlServiceProxy::Begin(const ClientContextPtr& context, TransactionHand
   auto executor = pool->GetExecutor();
 
   Status status;
-  if(executor == nullptr) {
-    status.SetFrameworkRetCode(TrpcRetCode::TRPC_CLIENT_CONNECT_ERR);
-    status.SetErrorMessage("connection failed");
-    TRPC_FMT_ERROR("service name:{}, connection failed", GetServiceName());
+  if(!executor->IsConnected()) {
+    std::string error_message = util::FormatString("service name:{}, connection failed. {}.",
+                                                   GetServiceName(), executor->GetErrorMessage());
+    TRPC_LOG_ERROR(error_message);
+    status.SetFrameworkRetCode(executor->GetErrorNumber());
+    status.SetErrorMessage(error_message);
     context->SetStatus(std::move(status));
   } else {
     status = UnaryInvoke(context, executor, res, "begin");
@@ -128,8 +123,9 @@ Status MysqlServiceProxy::Begin(const ClientContextPtr& context, TransactionHand
 
 
   if(context->GetStatus().OK()) {
-    handle.SetExecutor(std::move(executor));
-    handle.SetState(TransactionHandle::TxState::kStarted);
+    handle = MakeRefCounted<TransactionHandle>();
+    handle->SetExecutor(std::move(executor));
+    handle->SetState(TransactionHandle::TxState::kStarted);
   }
 
   RunFilters(FilterPoint::CLIENT_POST_RPC_INVOKE, context);
@@ -174,13 +170,15 @@ Future<TxHandlePtr> MysqlServiceProxy::AsyncBegin(const ClientContextPtr &contex
 
   MysqlExecutorPool* pool = this->pool_manager_->Get(node_addr);
   auto executor = pool->GetExecutor();
-  if(executor == nullptr) {
-    TRPC_FMT_ERROR("service name:{}, connection failed", GetServiceName());
+  if(!executor->IsConnected()) {
+    std::string error_message = util::FormatString("service name:{}, connection failed. {}.",
+                                                   GetServiceName(), executor->GetErrorMessage());
+    TRPC_LOG_ERROR(error_message);
     Status status;
-    status.SetFrameworkRetCode(TrpcRetCode::TRPC_CLIENT_CONNECT_ERR);
-    status.SetErrorMessage("connection failed");
+    status.SetFrameworkRetCode(executor->GetErrorNumber());
+    status.SetErrorMessage(error_message);
     context->SetStatus(status);
-    return MakeExceptionFuture<TxHandlePtr>(CommonException("connection failed"));
+    return MakeExceptionFuture<TxHandlePtr>(CommonException(error_message.c_str()));
   }
 
   return AsyncUnaryInvoke<OnlyExec>(context, executor, "begin")
@@ -195,7 +193,7 @@ Future<TxHandlePtr> MysqlServiceProxy::AsyncBegin(const ClientContextPtr &contex
           });
 }
 
-Status MysqlServiceProxy::Commit(const ClientContextPtr &context, TransactionHandle &handle) {
+Status MysqlServiceProxy::Commit(const ClientContextPtr &context, const TxHandlePtr& handle) {
   MysqlResults<OnlyExec> res;
   Status s = Execute(context, handle, res, "commit");
 
@@ -210,7 +208,7 @@ Status MysqlServiceProxy::Commit(const ClientContextPtr &context, TransactionHan
   return context->GetStatus();
 }
 
-Status MysqlServiceProxy::Rollback(const ClientContextPtr &context, TransactionHandle &handle) {
+Status MysqlServiceProxy::Rollback(const ClientContextPtr &context, const TxHandlePtr& handle) {
   MysqlResults<OnlyExec> res;
   Status s = Execute(context, handle, res, "rollback");
 
@@ -233,7 +231,7 @@ Future<> MysqlServiceProxy::AsyncCommit(const ClientContextPtr &context, const T
             if(f.IsFailed()) {
               return MakeExceptionFuture<>(f.GetException());
             }
-            EndTransaction(*handle, false);
+            EndTransaction(handle, false);
             return MakeReadyFuture<>();
           });
 }
@@ -247,22 +245,22 @@ Future<> MysqlServiceProxy::AsyncRollback(const ClientContextPtr &context, const
               return MakeExceptionFuture<>(f.GetException());
             }
             auto t = f.GetValue();
-            EndTransaction(*handle, true);
+            EndTransaction(handle, true);
             return MakeReadyFuture<>();
           });
 }
 
 
-bool MysqlServiceProxy::EndTransaction(TransactionHandle &handle, bool rollback) {
+bool MysqlServiceProxy::EndTransaction(const TxHandlePtr &handle, bool rollback) {
 
-  handle.SetState(rollback? TransactionHandle::TxState::kRollBacked : TransactionHandle::TxState::kCommitted);
-  auto executor = handle.GetExecutor();
+  handle->SetState(rollback? TransactionHandle::TxState::kRollBacked : TransactionHandle::TxState::kCommitted);
+  auto executor = handle->GetExecutor();
   if(executor) {
     NodeAddr node_addr;
     node_addr.ip = executor->GetIp();
     node_addr.port = executor->GetPort();
     MysqlExecutorPool *pool = pool_manager_->Get(node_addr);
-    pool->Reclaim(0, handle.TransferExecutor());
+    pool->Reclaim(0, handle->TransferExecutor());
   }
   return true;
 }

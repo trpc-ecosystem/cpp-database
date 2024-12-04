@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -85,12 +85,12 @@ class MysqlServiceProxy : public ServiceProxy {
 
   /// @brief Transaction support for query. A TransactionHandle which has been called "Begin" is needed.
   template <typename... OutputArgs, typename... InputArgs>
-  Status Query(const ClientContextPtr& context, TransactionHandle& handle, MysqlResults<OutputArgs...>& res, const std::string& sql_str,
+  Status Query(const ClientContextPtr& context, const TxHandlePtr& handle, MysqlResults<OutputArgs...>& res, const std::string& sql_str,
                const InputArgs&... args);
 
   /// @brief Transaction support for query. A TransactionHandle which has been called "Begin" is needed.
   template <typename... OutputArgs, typename... InputArgs>
-  Status Execute(const ClientContextPtr& context, TransactionHandle& handle, MysqlResults<OutputArgs...>& res, const std::string& sql_str,
+  Status Execute(const ClientContextPtr& context, const TxHandlePtr& handle, MysqlResults<OutputArgs...>& res, const std::string& sql_str,
                  const InputArgs&... args);
 
   template <typename... OutputArgs, typename... InputArgs>
@@ -106,13 +106,13 @@ class MysqlServiceProxy : public ServiceProxy {
                                                                     const InputArgs&... args);
 
   /// @brief Begin a transaction. A empty handle is needed.
-  Status Begin(const ClientContextPtr& context, TransactionHandle& handle);
+  Status Begin(const ClientContextPtr& context, TxHandlePtr& handle);
 
   /// @brief Commit a transaction.
-  Status Commit(const ClientContextPtr& context, TransactionHandle& handle);
+  Status Commit(const ClientContextPtr& context, const TxHandlePtr& handle);
 
   /// @brief Rollback a transaction.
-  Status Rollback(const ClientContextPtr& context, TransactionHandle& handle);
+  Status Rollback(const ClientContextPtr& context, const TxHandlePtr& handle);
 
 
   /// @brief Begin a transaction.
@@ -166,7 +166,10 @@ class MysqlServiceProxy : public ServiceProxy {
                                                        const InputArgs&... args);
 
 
-  bool EndTransaction(TransactionHandle& handle, bool rollback);
+  /// @brief Set the handle state and reclaim its executor.
+  /// @param rollback set the state to rollback otherwise commited.
+  /// @return true if success.
+  bool EndTransaction(const TxHandlePtr& handle, bool rollback);
 
  private:
   std::unique_ptr<ThreadPool> thread_pool_{nullptr};
@@ -236,29 +239,36 @@ Future<MysqlResults<OutputArgs...>> MysqlServiceProxy::AsyncExecute(const Client
 
 template<typename... OutputArgs, typename... InputArgs>
 Status MysqlServiceProxy::Query(const ClientContextPtr &context,
-                         TransactionHandle &handle,
-                         MysqlResults<OutputArgs...> &res,
-                         const std::string &sql_str,
-                         const InputArgs &... args) {
+                                const TxHandlePtr& handle,
+                               MysqlResults<OutputArgs...> &res,
+                               const std::string &sql_str,
+                               const InputArgs &... args) {
 
+  Status status;
   FillClientContext(context);
 
   auto filter_status = filter_controller_.RunMessageClientFilters(FilterPoint::CLIENT_PRE_RPC_INVOKE, context);
-  if (filter_status == FilterStatus::REJECT)
+
+  if (filter_status == FilterStatus::REJECT) {
     TRPC_FMT_ERROR("service name:{}, filter execute failed.", GetServiceName());
-  else if (handle.GetState() != TransactionHandle::TxState::kStarted) {
-    Status status;
-    status.SetFrameworkRetCode(TrpcRetCode::TRPC_CLIENT_CONNECT_ERR);
-    status.SetErrorMessage("Invalid TransactionHandle state.");
-    context->SetStatus(status);
-  } else if(!handle.GetExecutor()->IsConnectionValid()) {
-    handle.SetState(TransactionHandle::TxState::kRollBacked);
-    Status status;
+  }
+  else if (handle->GetState() != TransactionHandle::TxState::kStarted) {
+
+    TRPC_FMT_ERROR("service name:{}, query in an invalid transaction.", GetServiceName());
+    status.SetFrameworkRetCode(TrpcMysqlRetCode::TRPC_MYSQL_INVALID_HANDLE);
+    status.SetErrorMessage(util::FormatString("Invalid transaction state code: {}.", int(handle->GetState())));
+    context->SetStatus(std::move(status));
+
+  } else if(!handle->GetExecutor()->CheckAlive()) {
+    // If the Connection lost the transaction will be rollback automatically. (some exception?)
+    TRPC_FMT_ERROR("service name:{}, transaction connection lost.", GetServiceName());
+    handle->SetState(TransactionHandle::TxState::kRollBacked);
     status.SetFrameworkRetCode(TrpcRetCode::TRPC_CLIENT_CONNECT_ERR);
     status.SetErrorMessage("Connect error. Rollback.");
     context->SetStatus(status);
+
   } else {
-    UnaryInvoke(context, handle.GetExecutor(), res, sql_str, args...);
+    UnaryInvoke(context, handle->GetExecutor(), res, sql_str, args...);
   }
 
   RunFilters(FilterPoint::CLIENT_POST_RPC_INVOKE, context);
@@ -267,7 +277,7 @@ Status MysqlServiceProxy::Query(const ClientContextPtr &context,
 
 template <typename... OutputArgs, typename... InputArgs>
 Status MysqlServiceProxy::Execute(const ClientContextPtr& context,
-                                  TransactionHandle& handle,
+                                  const TxHandlePtr& handle,
                                   MysqlResults<OutputArgs...>& res,
                                   const std::string& sql_str,
                                   const InputArgs&... args) {
@@ -301,7 +311,7 @@ MysqlServiceProxy::AsyncQuery(const ClientContextPtr &context, const TxHandlePtr
     return MakeExceptionFuture<MysqlResults<OutputArgs...>>(CommonException("Invalid handle."));
   }
 
-  if(!handle->GetExecutor()->IsConnectionValid()) {
+  if(!handle->GetExecutor()->CheckAlive()) {
     handle->SetState(TransactionHandle::TxState::kRollBacked);
     Status status;
     status.SetFrameworkRetCode(TrpcRetCode::TRPC_CLIENT_CONNECT_ERR);
@@ -366,11 +376,13 @@ Status MysqlServiceProxy::UnaryInvoke(const ClientContextPtr& context, const Exe
     } else
       conn = executor;
 
-    if(conn == nullptr) {
+    if(!conn->IsConnected()) {
+      std::string error_message = util::FormatString("service name:{}, connection failed. {}.",
+                                                     GetServiceName(), conn->GetErrorMessage());
+      TRPC_LOG_ERROR(error_message);
       Status status;
-      status.SetFrameworkRetCode(TrpcRetCode::TRPC_CLIENT_CONNECT_ERR);
-      status.SetErrorMessage("connection failed");
-      TRPC_FMT_ERROR("service name:{}, connection failed", GetServiceName());
+      status.SetFrameworkRetCode(conn->GetErrorNumber());
+      status.SetErrorMessage(error_message);
       context->SetStatus(std::move(status));
     } else {
       if constexpr (MysqlResults<OutputArgs...>::mode == MysqlResultsMode::OnlyExec)
@@ -389,7 +401,7 @@ Status MysqlServiceProxy::UnaryInvoke(const ClientContextPtr& context, const Exe
   if(!res.OK()) {
     Status s;
     s.SetErrorMessage(res.GetErrorMessage());
-    s.SetFuncRetCode(-1);
+    s.SetFrameworkRetCode(res.GetErrorNumber());
     context->SetStatus(std::move(s));
   }
 
@@ -435,12 +447,13 @@ MysqlServiceProxy::AsyncUnaryInvoke(const ClientContextPtr& context, const Execu
     } else
       conn = executor;
 
-    if (TRPC_UNLIKELY(!conn)) {
-      TRPC_FMT_ERROR("service name:{}, connection failed", GetServiceName());
-
+    if (TRPC_UNLIKELY(!conn->IsConnected())) {
+      std::string error_message = util::FormatString("service name:{}, connection failed. {}.",
+                                                     GetServiceName(), conn->GetErrorMessage());
+      TRPC_LOG_ERROR(error_message);
       Status status;
-      status.SetFrameworkRetCode(TrpcRetCode::TRPC_CLIENT_CONNECT_ERR);
-      status.SetErrorMessage("connection failed");
+      status.SetFrameworkRetCode(conn->GetErrorNumber());
+      status.SetErrorMessage(error_message);
 
       context->SetStatus(status);
       p.SetException(CommonException(status.ErrorMessage().c_str()));
