@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -20,40 +20,41 @@
 #include <string>
 #include <list>
 #include "trpc/client/mysql/executor/mysql_executor.h"
-#include "trpc/client/mysql/mysql_service_config.h"
 #include "trpc/transport/common/transport_message_common.h"
 
 
 namespace trpc::mysql {
 
-class MysqlExecutorPool {
- public:
+struct MysqlExecutorPoolOption {
+  uint32_t max_size{0};       // Maximum number of connections in the pool
 
-  virtual ~MysqlExecutorPool() = default;
+  uint64_t max_idle_time{0};  // Maximum idle time for connections
 
-  virtual RefPtr<MysqlExecutor> GetExecutor() = 0;
+  uint32_t num_shard_group{4};
 
-  virtual void Reclaim(int ret, RefPtr<MysqlExecutor>&&) = 0;
+  std::string dbname;
 
-  virtual void Stop() {}
+  std::string username;
 
-  virtual void Destroy() {}
+  std::string password;
+
+  std::string char_set;
 };
 
-
-
-
-class MysqlExecutorPoolImpl : public MysqlExecutorPool {
+class MysqlExecutorPool {
  public:
-  MysqlExecutorPoolImpl(const MysqlExecutorPoolOption& option, const NodeAddr& node_addr);
+  MysqlExecutorPool(const MysqlExecutorPoolOption& option, const NodeAddr& node_addr);
 
-  RefPtr<MysqlExecutor> GetExecutor() override;
 
-  void Reclaim(int ret, RefPtr<MysqlExecutor>&&) override;
+  /// @return An executor ptr. Need to use MysqlExecutor::IsConnected to check state.
+  ///  and can get error by MysqlExecutor::GetErrorMessage
+  RefPtr<MysqlExecutor> GetExecutor();
 
-  void Stop() override;
+  void Reclaim(int ret, RefPtr<MysqlExecutor>&&);
 
-  void Destroy() override;
+  void Stop();
+
+  void Destroy();
 
  private:
   RefPtr<MysqlExecutor> CreateExecutor(uint32_t shard_id);
@@ -63,23 +64,14 @@ class MysqlExecutorPoolImpl : public MysqlExecutorPool {
   bool IsIdleTimeout(RefPtr<MysqlExecutor> executor);
 
  private:
-  std::string m_ip_;
-  uint16_t m_port_;
-  std::string m_user_;
-  std::string m_passwd_;
-  std::string m_db_name_;
-  std::string m_char_set_;
+  MysqlExecutorPoolOption pool_option_;
 
-  uint32_t num_shard_group_{4};
+  NodeAddr target_;
+
   std::atomic<uint32_t> executor_num_{0};
 
   // The maximum number of connections that can be stored per `Shard` in `conn_shards_`
   uint32_t max_num_per_shard_{0};
-
-  uint32_t max_conn_{0};
-
-  uint64_t max_idle_time_{0};
-
 
   struct alignas(hardware_destructive_interference_size) Shard {
     std::mutex lock;
@@ -88,11 +80,8 @@ class MysqlExecutorPoolImpl : public MysqlExecutorPool {
 
   std::unique_ptr<Shard[]> executor_shards_;
 
-
-
   std::atomic<uint32_t> shard_id_gen_{0};
   std::atomic<uint32_t> executor_id_gen_{0};
-
 
 };
 

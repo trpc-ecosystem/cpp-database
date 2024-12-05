@@ -558,7 +558,7 @@ proxy->Execute(ctx, exec_res, "delete from users where username = \"jack\"");
 | TransactionHandle::TxState | 描述                                   |
 |----------------------------|--------------------------------------|
 | `kNotInited`                 | 未初始化(空事务)                            |
-| `kStart`                     | 事务已开始                                |
+| `kStarted`                     | 事务已开始                                |
 | `kRollBacked`                | 事务已回滚                                |
 | `kCommitted`                 | 事务已提交                                |
 | `kInValid`                   | 事务无效（对象被move时的状态，并非指rollback或commit） |

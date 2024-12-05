@@ -6,11 +6,13 @@ package(
 
 cc_library(
     name = "mysqlclient_deps",
-    srcs = [
-            "lib/private/libcrypto.so.3",
-            "lib/private/libssl.so.3"
+    srcs = [],
+    hdrs = [],
+    linkopts = [
+        "-lssl",
+        "-lcrypto",
     ],
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
 )
 
 cc_library(

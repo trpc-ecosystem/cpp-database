@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -20,11 +20,16 @@
 #include <vector>
 #include <iostream>
 #include "trpc/client/mysql/executor/mysql_type.h"
+#include "trpc/util/string_util.h"
 #include <unordered_set>
 
-#define BIND_POINTER_CAST(v) (const_cast<void*>(static_cast<const void*>(v)))
 
 namespace trpc::mysql {
+
+template <typename T>
+void* BindPointerCast(const T* ptr) {
+  return const_cast<void*>(static_cast<const void*>(ptr));
+}
 
 ///@brief map type information for mysql api
 template <typename T>
@@ -41,7 +46,7 @@ struct MysqlInputType {
     static constexpr bool is_unsigned = is_unsigned_type;                      \
   };
 
-
+// Used for `StepInputBind(MYSQL_BIND& bind, const T& value)`
 MYSQL_INPUT_TYPE_SPECIALIZATION(int8_t, MYSQL_TYPE_TINY, false)
 MYSQL_INPUT_TYPE_SPECIALIZATION(uint8_t, MYSQL_TYPE_TINY, true)
 MYSQL_INPUT_TYPE_SPECIALIZATION(int16_t, MYSQL_TYPE_SHORT, false)
@@ -52,7 +57,7 @@ MYSQL_INPUT_TYPE_SPECIALIZATION(int64_t, MYSQL_TYPE_LONGLONG, false)
 MYSQL_INPUT_TYPE_SPECIALIZATION(uint64_t, MYSQL_TYPE_LONGLONG, true)
 MYSQL_INPUT_TYPE_SPECIALIZATION(float, MYSQL_TYPE_FLOAT, false)
 MYSQL_INPUT_TYPE_SPECIALIZATION(double, MYSQL_TYPE_DOUBLE, false)
-MYSQL_INPUT_TYPE_SPECIALIZATION(MysqlTime, MYSQL_TYPE_DATETIME, true)
+//MYSQL_INPUT_TYPE_SPECIALIZATION(MysqlTime, MYSQL_TYPE_DATETIME, true)
 
 
 
@@ -92,11 +97,12 @@ inline bool OutputTypeValid(enum_field_types mysql_type) {
 // Input Bind
 // ***********
 
+/// @brief enable_if to bypass types convertible to std::string_view like char*.
 template <typename T, typename = std::enable_if_t<!std::is_convertible<T, std::string_view>::value>>
 inline void StepInputBind(MYSQL_BIND& bind, const T& value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MysqlInputType<T>::value;
-  bind.buffer = BIND_POINTER_CAST(&value);
+  bind.buffer = BindPointerCast(&value);
   bind.is_unsigned = MysqlInputType<T>::is_unsigned;
 }
 
@@ -104,17 +110,18 @@ inline void StepInputBind(MYSQL_BIND& bind, const T& value) {
 inline void StepInputBind(MYSQL_BIND& bind, const MysqlBlob& value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MYSQL_TYPE_BLOB;
-  bind.buffer = BIND_POINTER_CAST(value.data_ptr());
-  bind.buffer_length = value.size();
+  bind.buffer = BindPointerCast(value.DataConstPtr());
+  bind.buffer_length = value.Size();
   bind.length = &bind.buffer_length;
   bind.is_unsigned = false;
 }
 
-
+/// @brief Overload for MysqlTime. This avoids relying on the general template
+/// to prevent issues if the MysqlTime class changes and value.DataConstPtr() != &value.
 inline void StepInputBind(MYSQL_BIND& bind, const MysqlTime& value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MYSQL_TYPE_DATETIME;
-  bind.buffer = BIND_POINTER_CAST(value.DataConstPtr());
+  bind.buffer = BindPointerCast(value.DataConstPtr());
   bind.is_unsigned = true;
 }
 
@@ -122,7 +129,7 @@ inline void StepInputBind(MYSQL_BIND& bind, const MysqlTime& value) {
 inline void StepInputBind(MYSQL_BIND& bind, std::string_view value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MYSQL_TYPE_STRING;
-  bind.buffer = BIND_POINTER_CAST(value.data());
+  bind.buffer = BindPointerCast(value.data());
   bind.buffer_length = value.length();
   bind.length = &bind.buffer_length;
   bind.is_unsigned = false;
@@ -139,10 +146,11 @@ inline void BindInputImpl(std::vector<MYSQL_BIND>& binds, const InputArgs&... ar
 // Output Bind
 // ***********
 
+constexpr int TRPC_BIND_BUFFER_MIN_SIZE = 32;
+
+/// @note the buffer.buffer_type has been set before this function
 template <typename T>
 inline void StepOutputBind(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uint8_t& null_flag) {
-  bind.buffer_type = MysqlInputType<T>::value;
-  bind.is_unsigned = MysqlInputType<T>::is_unsigned;
   buffer.resize(sizeof(T));
   bind.buffer = buffer.data();
   bind.is_null = reinterpret_cast<bool*>(&null_flag);
@@ -150,9 +158,8 @@ inline void StepOutputBind(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uin
 
 template <>
 inline void StepOutputBind<std::string>(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uint8_t& null_flag) {
-  bind.buffer_type = MYSQL_TYPE_STRING;
   if (buffer.empty()) {
-    buffer.resize(32);  // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
+    buffer.resize(TRPC_BIND_BUFFER_MIN_SIZE);  // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
   }
   bind.buffer = buffer.data();
   bind.is_null = reinterpret_cast<bool*>(&null_flag);
@@ -161,9 +168,8 @@ inline void StepOutputBind<std::string>(MYSQL_BIND& bind, std::vector<std::byte>
 
 template <>
 inline void StepOutputBind<MysqlBlob>(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uint8_t& null_flag) {
-  bind.buffer_type = MYSQL_TYPE_BLOB;
   if (buffer.empty()) {
-    buffer.resize(32); // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
+    buffer.resize(TRPC_BIND_BUFFER_MIN_SIZE); // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
   }
   bind.buffer = buffer.data();
   bind.is_null = reinterpret_cast<bool*>(&null_flag);
@@ -177,6 +183,35 @@ inline void BindOutputImpl(std::vector<MYSQL_BIND>& output_binds,
 
   size_t i = 0;
   ((StepOutputBind<OutputArgs>(output_binds[i], output_buffers[i], null_flag_buffer[i]), i++), ...);
+}
+
+
+template <typename... Args>
+inline std::string CheckFieldsOutputArgs(MYSQL_RES* res) {
+  std::string error;
+  unsigned int num_fields = mysql_num_fields(res);
+  if(num_fields != sizeof ...(Args)) {
+    error = util::FormatString("The query field count is {}, but you give {} OutputArgs.",
+                              num_fields, sizeof...(Args));
+    return error;
+  }
+
+  MYSQL_FIELD* fields_meta = mysql_fetch_fields(res);
+
+  unsigned long i = 0;
+  std::vector<unsigned long> failed_index;
+
+  ((OutputTypeValid<Args>(fields_meta[i].type) ? (void)i++ : failed_index.push_back(i++)), ...);
+
+  if(!failed_index.empty()) {
+    error = "Bind output type warning for fields: (";
+    error += std::string(fields_meta[failed_index[0]].name);
+    for(i = 1; i < failed_index.size(); i++)
+      error.append(", ").append(fields_meta[failed_index[i]].name);
+    error.append(").");
+    return error;
+  }
+  return "";
 }
 
 

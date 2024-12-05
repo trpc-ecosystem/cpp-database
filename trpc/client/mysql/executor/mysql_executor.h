@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -21,12 +21,15 @@
 #include <type_traits>
 #include <variant>
 #include <vector>
+#include "trpc/common/status.h"
 #include "trpc/client/mysql/executor/mysql_binder.h"
 #include "trpc/client/mysql/executor/mysql_results.h"
 #include "trpc/client/mysql/executor/mysql_statement.h"
 #include "trpc/util/ref_ptr.h"
 #include "trpc/util/string_util.h"
 #include "trpc/util/time.h"
+#include "trpc/util/log/logging.h"
+#include "trpc/client/mysql/mysql_error_number.h"
 
 namespace trpc::mysql {
 
@@ -71,29 +74,34 @@ class Formatter {
   }
 };
 
+
+struct MysqlConnOption {
+
+  std::string hostname;
+
+  std::string username;
+
+  std::string password;
+
+  std::string database;
+
+  uint16_t port{0};
+
+  std::string char_set{"utf8mb4"};
+};
+
 /// @brief A MySQL connection class that wraps the MySQL C API.
 /// @note This class is not thread-safe. Ensure exclusive ownership during queries.
 class MysqlExecutor : public RefCounted<MysqlExecutor> {
-
+ private:
   template <typename... OutputArgs>
   class QueryHandle {
+
    public:
     using DataBufferT = std::vector<std::vector<std::byte>>;
     using FlagBufferT = std::vector<uint8_t>;
 
     QueryHandle(MysqlResults<OutputArgs...>* mysql_results, MysqlStatement* statement, size_t field_count);
-
-    MysqlResults<OutputArgs...>* mysql_results = nullptr;
-    MysqlStatement* statement = nullptr;
-
-    std::unique_ptr<std::vector<MYSQL_BIND>> output_binds;
-    std::unique_ptr<DataBufferT> output_buffer;
-    std::unique_ptr<std::vector<unsigned long>> output_length;
-    std::unique_ptr<FlagBufferT> null_flag_buffer;
-
-    // Indicate which column are variable-length data. It will be used in MysqlExecutro::FetchTruncatedResults.
-    // Only variable-length data column may be truncated.
-    std::vector<size_t> dynamic_buffer_index;
 
    private:
 
@@ -102,20 +110,41 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
 
     void ResizeOutputBuffer();
 
+   public:
+    MysqlResults<OutputArgs...>* mysql_results = nullptr;
+
+    MysqlStatement* statement = nullptr;
+
+    std::unique_ptr<std::vector<MYSQL_BIND>> output_binds;
+
+    std::unique_ptr<DataBufferT> output_buffer;
+
+    std::unique_ptr<std::vector<unsigned long>> output_length;
+
+    std::unique_ptr<FlagBufferT> null_flag_buffer;
+
+    // Indicate which column are variable-length data. It will be used in MysqlExecutor::FetchTruncatedResults.
+    // Only variable-length data column may be truncated.
+    std::vector<size_t> dynamic_buffer_index;
+
    private:
     size_t dynamic_buffer_size_;    // the initial buffer size of variant size type (string, blob)
   };
 
  public:
 
-  MysqlExecutor(const std::string& hostname, const std::string& username, const std::string& password,
-                const std::string& database, uint16_t port = 0, const std::string& char_set = "utf8mb4");
+  MysqlExecutor(const MysqlConnOption& option);
+
+  MysqlExecutor(MysqlConnOption&& option);
 
   ~MysqlExecutor();
 
   MysqlExecutor(const MysqlExecutor& rhs) = delete;
+
   MysqlExecutor(MysqlExecutor&& rhs) = delete;
+
   MysqlExecutor& operator=(const MysqlExecutor& rhs) = delete;
+
   MysqlExecutor& operator=(MysqlExecutor&& rhs) = delete;
 
   ///@brief Connect to mysql server.
@@ -127,7 +156,7 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
   ///@brief set auto commit for current session
   ///@param mode true if enable auto commit else false
   ///@return true if no error
-  bool Autocommit(bool mode);
+  bool AutoCommit(bool mode);
 
   ///@brief Executes an SQL query and retrieves all resulting rows, storing each row as a tuple.
   ///
@@ -147,13 +176,25 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
   template <typename... InputArgs>
   bool Execute(MysqlResults<OnlyExec>& mysql_results, const std::string& query, const InputArgs&... args);
 
+  /// @brief Get the error from MYSQL* mysql_.
+  /// @note If use prepared statement (e.g. template <typename... InputArgs, typename... OutputArgs>
+  ///  bool QueryAllInternal), the error should be get from mysql_stmt.
+  int GetErrorNumber();
+
+  /// @brief Get the error from MYSQL* mysql_.
+  /// @note If use prepared statement (e.g. template <typename... InputArgs, typename... OutputArgs>
+  ///  bool QueryAllInternal), the error should be get from mysql_stmt.
   std::string GetErrorMessage();
 
   void RefreshAliveTime();
 
-  uint64_t GetAliveTime();
+  uint64_t GetAliveTime() const;
 
-  bool IsConnectionValid();
+  /// @brief Ping the MySQL server.
+  bool CheckAlive();
+
+  /// @brief Just return the member is_connected.
+  bool IsConnected();
 
   bool Reconnect();
 
@@ -194,9 +235,9 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
   template <typename... OutputArgs>
   void BindOutputs(MysqlExecutor::QueryHandle<OutputArgs...>& handle);
 
-  ExecuteStatus ExecuteStatement(std::vector<MYSQL_BIND>& output_binds, MysqlStatement& statement);
+  Status ExecuteStatement(std::vector<MYSQL_BIND>& output_binds, MysqlStatement& statement);
 
-  ExecuteStatus ExecuteStatement(MysqlStatement& statement);
+  Status ExecuteStatement(MysqlStatement& statement);
 
   template <typename... OutputArgs>
   bool FetchResults(MysqlExecutor::QueryHandle<OutputArgs...>& handle);
@@ -209,25 +250,18 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
   /// Just protects the `mysql_init` api
   static std::mutex mysql_mutex;
 
-  bool is_connected;
+  bool is_connected{false};
 
+  // by-default: https://dev.mysql.com/doc/refman/8.4/en/innodb-autocommit-commit-rollback.html
   bool auto_commit_{true};
 
-  MYSQL* mysql_;
+  MYSQL* mysql_{nullptr};
 
-  uint64_t m_alivetime;
+  uint64_t m_alivetime{0};
 
   uint64_t executor_id_{0};
 
-  std::string hostname_;
-
-  std::string username_;
-
-  std::string password_;
-
-  std::string database_;
-
-  uint16_t port_;
+  MysqlConnOption option_;
 };
 
 template <typename... OutputArgs>
@@ -261,10 +295,7 @@ void MysqlExecutor::QueryHandle<OutputArgs...>::ResizeOutputBuffer() {
 template <typename... InputArgs, typename... OutputArgs>
 bool MysqlExecutor::QueryAll(MysqlResults<OutputArgs...>& mysql_results, const std::string& query,
                              const InputArgs&... args) {
-  //  static_assert(!MysqlResults<OutputArgs...>::is_only_exec, "MysqlResults<OnlyExec> cannot be used with QueryAll.");
-
-  static_assert(MysqlResults<OutputArgs...>::mode != MysqlResultsMode::OnlyExec,
-                "MysqlResults<OnlyExec> cannot be used with QueryAll.");
+  TRPC_ASSERT(MysqlResults<OutputArgs...>::mode != MysqlResultsMode::OnlyExec);
 
   if (!QueryAllInternal(mysql_results, query, args...)) return false;
 
@@ -286,7 +317,22 @@ void MysqlExecutor::BindInputArgs(std::vector<MYSQL_BIND>& params, const InputAr
 
 template <typename... OutputArgs>
 void MysqlExecutor::BindOutputs(MysqlExecutor::QueryHandle<OutputArgs...>& handle) {
+
+  // 1. Set the buffer type
+  MYSQL_FIELD* fields_meta = mysql_fetch_fields(handle.statement->GetResultsMeta());
+  // The output_binds length and num fields must be checked before this function.
+  for(size_t i = 0; i < (*handle.output_binds).size(); i++) {
+    handle.output_binds->at(i).buffer_type = fields_meta[i].type;
+  }
+
+  // 2. Bind each MYSQL_BIND in handle.output_binds
   BindOutputImpl<OutputArgs...>(*handle.output_binds, *handle.output_buffer, *handle.null_flag_buffer);
+
+  // 3. The MySQL api will return the fetched data size to the handle.output_length
+  //    So, we set MYSQL_BIND's length pointer to handle.output_length
+  for (size_t i = 0; i < handle.output_binds->size(); i++) {
+    handle.output_binds->at(i).length = &handle.output_length->at(i);
+  }
 }
 
 template <typename... InputArgs, typename... OutputArgs>
@@ -298,21 +344,16 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   MysqlStatement stmt(mysql_);
 
   if (!stmt.Init(query)) {
-    mysql_results.error_message = stmt.GetErrorMessage();
+    mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return false;
   }
 
-  if (stmt.GetParamsCount() != sizeof...(InputArgs)) {
-    mysql_results.error_message = util::FormatString("The query params count is {}, but you give {} InputputArgs.",
-                                                     stmt.GetParamsCount(), sizeof...(InputArgs));
-    stmt.CloseStatement();
-    return false;
-  }
-
-  if (stmt.GetFieldCount() != sizeof...(OutputArgs)) {
-    mysql_results.error_message = util::FormatString("The query field count is {}, but you give {} OutputArgs.",
-                                                     stmt.GetFieldCount(), sizeof...(OutputArgs));
+  std::string field_type_check_message = CheckFieldsOutputArgs<OutputArgs...>(stmt.GetResultsMeta());
+  if((!field_type_check_message.empty())) {
+    mysql_results.SetErrorMessage(std::move(field_type_check_message));
+    mysql_results.SetErrorNumber(TrpcMysqlRetCode::TRPC_MYSQL_STMT_PARAMS_ERROR);
     stmt.CloseStatement();
     return false;
   }
@@ -320,7 +361,8 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   BindInputArgs(input_binds, args...);
 
   if (!stmt.BindParam(input_binds)) {
-    mysql_results.error_message = stmt.GetErrorMessage();
+    mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return false;
   }
@@ -328,25 +370,23 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   QueryHandle handle = QueryHandle(&mysql_results, &stmt, stmt.GetFieldCount());
 
   BindOutputs<OutputArgs...>(handle);
-  for (size_t i = 0; i < handle.output_binds->size(); i++) {
-    handle.output_binds->at(i).length = &handle.output_length->at(i);
-  }
 
-  auto status = ExecuteStatement(*handle.output_binds, stmt);
-  if (!status.success) {
-    mysql_results.error_message = status.error_message;
+  Status s = ExecuteStatement(*handle.output_binds, stmt);
+  if (!s.OK()) {
+    mysql_results.SetErrorMessage(s.ErrorMessage());
+    mysql_results.SetErrorNumber(s.GetFrameworkRetCode());
     stmt.CloseStatement();
     return false;
   }
 
   if (!FetchResults(handle)) {
-    mysql_results.error_message = stmt.GetErrorMessage();
+    mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return false;
   }
 
   mysql_results.SetFieldsName(stmt.GetResultsMeta());
-  mysql_results.CheckFieldsType(stmt.GetResultsMeta());
   stmt.CloseStatement();
   return true;
 }
@@ -361,12 +401,14 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<NativeString>& mysql_result, c
 
   if (mysql_real_query(mysql_, query_str.c_str(), query_str.length())) {
     mysql_result.SetErrorMessage(GetErrorMessage());
+    mysql_result.SetErrorNumber(GetErrorNumber());
     return false;
   }
 
   MYSQL_RES* res_ptr = mysql_store_result(mysql_);
   if (res_ptr == nullptr) {
     mysql_result.SetErrorMessage(GetErrorMessage());
+    mysql_result.SetErrorNumber(GetErrorNumber());
     return false;
   }
 
@@ -375,14 +417,14 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<NativeString>& mysql_result, c
   while ((row = mysql_fetch_row(res_ptr)) != nullptr) {
     unsigned long* lengths;
     results.emplace_back();
-    mysql_result.null_flags.emplace_back(num_fields, false);
+    mysql_result.null_flags_.emplace_back(num_fields, false);
     lengths = mysql_fetch_lengths(res_ptr);
 
     for (unsigned long i = 0; i < num_fields; i++) {
       if (row[i])
         results.back().emplace_back(row[i], lengths[i]);
       else {
-        mysql_result.null_flags.back()[i] = true;
+        mysql_result.null_flags_.back()[i] = true;
         results.back().emplace_back("");
       }
     }
@@ -399,7 +441,7 @@ bool MysqlExecutor::FetchResults(MysqlExecutor::QueryHandle<OutputArgs...>& hand
 
   int status = 0;
   auto& results = handle.mysql_results->MutableResultSet();
-  auto& res_null_flags = handle.mysql_results->null_flags;
+  auto& res_null_flags = handle.mysql_results->null_flags_;
   while (true) {
     status = mysql_stmt_fetch(handle.statement->STMTPointer());
     if (status == 1 || status == MYSQL_NO_DATA) break;
@@ -448,6 +490,7 @@ size_t MysqlExecutor::ExecuteInternal(const std::string& query, MysqlResults<Onl
 
   if (!stmt.Init(query)) {
     mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return 0;
   }
@@ -455,13 +498,15 @@ size_t MysqlExecutor::ExecuteInternal(const std::string& query, MysqlResults<Onl
 
   if (!stmt.BindParam(input_binds)) {
     mysql_results.SetErrorMessage(stmt.GetErrorMessage());
+    mysql_results.SetErrorNumber(stmt.GetErrorNumber());
     stmt.CloseStatement();
     return 0;
   }
 
-  auto status = ExecuteStatement(stmt);
-  if (!status.success) {
-    mysql_results.SetErrorMessage(status.error_message);
+  Status s = ExecuteStatement(stmt);
+  if (!s.OK()) {
+    mysql_results.SetErrorMessage(s.ErrorMessage());
+    mysql_results.SetErrorNumber(s.GetFrameworkRetCode());
     stmt.CloseStatement();
     return 0;
   }

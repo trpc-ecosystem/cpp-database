@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -34,11 +34,12 @@ using trpc::mysql::NativeString;
 using trpc::mysql::MysqlResults;
 using trpc::mysql::MysqlTime;
 using trpc::mysql::TransactionHandle;
+using trpc::mysql::TxHandlePtr;
 using trpc::Future;
 
 DEFINE_string(client_config, "fiber_client_client_config.yaml", "trpc cpp framework client_config file");
 
-void printResult(const std::vector<std::tuple<int, std::string>>& res_data) {
+void PrintResult(const std::vector<std::tuple<int, std::string>>& res_data) {
   for (const auto& tuple : res_data) {
     int id = std::get<0>(tuple);
     std::string username = std::get<1>(tuple);
@@ -97,75 +98,75 @@ void TestAsyncQuery(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
                         .Then([](trpc::Future<ResultType>&& f){
                           if(f.IsReady()) {
                             auto res = f.GetValue0();
-                            printResult(res.ResultSet());
+                            PrintResult(res.ResultSet());
                             return trpc::MakeReadyFuture();
                           }
                           return trpc::MakeExceptionFuture<>(f.GetException());
                         });
   std::cout << "do something\n";
-  trpc::future::BlockingGet(std::move(future));
+  auto future_waited = trpc::future::BlockingGet(std::move(future));
 
-  if(future.IsFailed()) {
-    TRPC_FMT_ERROR(future.GetException().what());
-    std::cerr << future.GetException().what() << std::endl;
+  if(future_waited.IsFailed()) {
+    TRPC_FMT_ERROR(future_waited.GetException().what());
+    std::cerr << future_waited.GetException().what() << std::endl;
     return;
   }
 }
 
 
 void TestAsyncTx(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
-  MysqlResults<OnlyExec> exec_res;
   MysqlResults<NativeString> query_res;
-  TransactionHandle handle;
-
+  TxHandlePtr handle = nullptr;
   trpc::ClientContextPtr ctx = trpc::MakeClientContext(proxy);
   proxy->Query(ctx, query_res, "select * from users");
 
-  // Do two query separately in the same one transaction and the handle will be moved to handle2
-  auto fu = proxy->AsyncBegin(ctx)
-          .Then([&handle](Future<TransactionHandle>&& f) mutable {
+  // Do two query separately in the same one transaction.
+  auto fut = proxy->AsyncBegin(ctx)
+          .Then([&handle](Future<TxHandlePtr>&& f) mutable {
             if(f.IsFailed())
               return trpc::MakeExceptionFuture<>(f.GetException());
+
+            // Get the ref counted handle ptr here.
+            // Or you can return Future<TxHandlePtr> and get the handle outside.
             handle = f.GetValue0();
             return trpc::MakeReadyFuture<>();
           });
 
-  trpc::future::BlockingGet(std::move(fu));
+  trpc::future::BlockingGet(std::move(fut));
 
-  auto fu2 = proxy
-          ->AsyncQuery<NativeString>(ctx, std::move(handle), "select username from users where username = ?", "alice")
-          .Then([](Future<TransactionHandle, MysqlResults<NativeString>>&& f) mutable {
+  auto fut2 = proxy
+          ->AsyncQuery<NativeString>(ctx, handle, "select username from users where username = ?", "alice")
+          .Then([](Future<MysqlResults<NativeString>>&& f) mutable {
             if(f.IsFailed())
-              return trpc::MakeExceptionFuture<TransactionHandle>(f.GetException());
+              return trpc::MakeExceptionFuture<>(f.GetException());
             auto t = f.GetValue();
-            auto res = std::move(std::get<1>(t));
+            auto res = std::move(std::get<0>(t));
 
             std::cout << "\n>>> select username from users where username = alice\n";
             PrintResultTable(res);
-            return trpc::MakeReadyFuture<TransactionHandle>(std::move(std::get<0>(t)));
+            return trpc::MakeReadyFuture<>();
           });
 
-  auto fu3 = trpc::future::BlockingGet(std::move(fu2));
+  auto fut3 = trpc::future::BlockingGet(std::move(fut2));
 
-  if(fu3.IsFailed()) {
-    TRPC_FMT_ERROR(fu3.GetException().what());
-    std::cerr << fu3.GetException().what() << std::endl;
+  if(fut3.IsFailed()) {
+    TRPC_FMT_ERROR(fut3.GetException().what());
+    std::cerr << fut3.GetException().what() << std::endl;
     return;
   }
-  TransactionHandle handle2(fu3.GetValue0());
 
   // Do query in "Then Chain" and rollback
   MysqlTime mtime;
   mtime.SetYear(2024).SetMonth(9).SetDay(10);
-  auto fu4 = proxy
-          ->AsyncExecute<OnlyExec>(ctx, std::move(handle2),
+  auto fut4 = proxy
+          ->AsyncExecute<OnlyExec>(ctx, handle,
                                    "insert into users (username, email, created_at)"
                                    "values (\"jack\", \"jack@abc.com\", ?)", mtime)
-          .Then([proxy, ctx](Future<TransactionHandle, MysqlResults<OnlyExec>>&& f) {
+          .Then([proxy, ctx, &handle](Future<MysqlResults<OnlyExec>>&& f) {
             if(f.IsFailed())
-              return trpc::MakeExceptionFuture<TransactionHandle, MysqlResults<OnlyExec>>(f.GetException());
+              return trpc::MakeExceptionFuture<MysqlResults<OnlyExec>>(f.GetException());
             auto t = f.GetValue();
-            auto res = std::move(std::get<1>(t));
+            auto res = std::move(std::get<0>(t));
             std::cout << "\n>>> "
                       << "insert into users (username, email, created_at)\n"
                       << "values (\"jack\", \"jack@abc.com\", \"2024-9-10\")\n\n"
@@ -174,36 +175,45 @@ void TestAsyncTx(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
                       << "\n";
 
             return proxy
-                    ->AsyncQuery<OnlyExec>(ctx, std::move(std::get<0>(t)),
+                    ->AsyncQuery<OnlyExec>(ctx, handle,
                                            "update users set email = ? where username = ? ", "jack@gmail.com", "jack");
           })
-          .Then([proxy, ctx](Future<TransactionHandle, MysqlResults<OnlyExec>>&& f) {
+          .Then([proxy, ctx, &handle](Future<MysqlResults<OnlyExec>>&& f) {
             if(f.IsFailed())
-              return trpc::MakeExceptionFuture<TransactionHandle, MysqlResults<NativeString>>(f.GetException());
+              return trpc::MakeExceptionFuture<MysqlResults<NativeString>>(f.GetException());
             auto t = f.GetValue();
-            auto res = std::move(std::get<1>(t));
+            auto res = std::move(std::get<0>(t));
             std::cout << "\n>>> "
                       << "update users set email = \"jack@gmail.com\" where username = \"jack\"\n\n"
                       << "affected rows: "
                       << res.GetAffectedRowNum()
                       << "\n";
 
-            return proxy->AsyncQuery<NativeString>(ctx, std::move(std::get<0>(t)), "select * from users");
+            return proxy->AsyncQuery<NativeString>(ctx, handle, "select * from users");
           })
-          .Then([proxy, ctx](Future<TransactionHandle, MysqlResults<NativeString>>&& f){
+          .Then([proxy, ctx, &handle](Future<MysqlResults<NativeString>>&& f){
             if(f.IsFailed())
-              return trpc::MakeExceptionFuture<TransactionHandle>(f.GetException());
+              return trpc::MakeExceptionFuture<MysqlResults<OnlyExec>>(f.GetException());
             auto t = f.GetValue();
-            auto res = std::move(std::get<1>(t));
+            auto res = std::move(std::get<0>(t));
 
             std::cout << "\n>>> select * from users\n";
             PrintResultTable(res);
             std::cout << "\n\n";
 
             return proxy
-                    ->AsyncRollback(ctx, std::move(std::get<0>(t)));
+                    ->AsyncQuery<OnlyExec>(ctx, handle,
+                                           "update unknown_table set email = ? where username = ? ", "jack@gmail.com", "jack");
           })
-          .Then([proxy, ctx](Future<TransactionHandle>&& f){
+          .Then([proxy, ctx, &handle](Future<MysqlResults<OnlyExec>>&& f) {
+            // The last sql query should return an error, and we roll back the transaction.
+            if(f.IsFailed()) {
+              TRPC_LOG_ERROR(f.GetException().what());
+              return proxy->AsyncRollback(ctx, handle);
+            }
+            return trpc::MakeReadyFuture();
+          })
+          .Then([proxy, ctx](Future<>&& f){
             if(f.IsFailed())
               return trpc::MakeExceptionFuture<>(f.GetException());
 
@@ -217,7 +227,7 @@ void TestAsyncTx(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
             return trpc::MakeReadyFuture<>();
           });
 
-  trpc::future::BlockingGet(std::move(fu4));
+  trpc::future::BlockingGet(std::move(fut4));
 
 }
 
@@ -243,12 +253,11 @@ void ParseClientConfig(int argc, char* argv[]) {
     std::cerr << "load client_config failed." << std::endl;
     exit(-1);
   }
-
-  ::trpc::mysql::InitPlugin();
 }
 
 int main(int argc, char* argv[]) {
   ParseClientConfig(argc, argv);
+  ::trpc::mysql::InitPlugin();
 
   std::cout << "*************************************\n"
             << "************future_client************\n"

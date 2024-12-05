@@ -6,12 +6,14 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 git_repository(
     name = "trpc_cpp",
-    remote = "https://github.com/trpc-group/trpc-cpp.git",
-    branch = "main",
+#    remote = "https://github.com/trpc-group/trpc-cpp.git",
+#    branch = "main",
+    remote = "https://github.com/KosmosFult/trpc-cpp.git",
+    branch = "mysql-main-repo"
 )
 
 load("@trpc_cpp//trpc:workspace.bzl", "trpc_workspace")
 trpc_workspace()
 
-load("//trpc:workspace.bzl", "database_mysql_workspace")
-database_mysql_workspace()
+load("//trpc:workspace.bzl", "trpc_database_mysql_workspace")
+trpc_database_mysql_workspace()

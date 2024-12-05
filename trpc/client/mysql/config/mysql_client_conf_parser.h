@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -29,8 +29,6 @@ struct convert<trpc::mysql::MysqlClientConf> {
     node["thread_num"] = mysql_conf.thread_num;
     node["thread_bind_core"] = mysql_conf.thread_bind_core;
     node["num_shard_group"] = mysql_conf.num_shard_group;
-    node["enable"] = mysql_conf.enable;
-
     return node;
   }
 
@@ -51,13 +49,10 @@ struct convert<trpc::mysql::MysqlClientConf> {
       mysql_conf.thread_num = node["thread_num"].as<size_t>();
     }
     if (node["thread_bind_core"]) {
-      mysql_conf.thread_bind_core = node["thread_bind_core"].as<bool>();
+      mysql_conf.thread_bind_core = node["thread_bind_core"].as<std::string>();
     }
     if (node["num_shard_group"]) {
       mysql_conf.num_shard_group = node["num_shard_group"].as<uint32_t>();
-    }
-    if (node["enable"]) {
-      mysql_conf.enable = node["enable"].as<bool>();
     }
 
     return true;

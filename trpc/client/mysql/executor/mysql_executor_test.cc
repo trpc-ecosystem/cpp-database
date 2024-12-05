@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -16,7 +16,6 @@
 
 #include "include/gtest/gtest.h"
 
-//#define private public
 
 #include "trpc/client/mysql/executor/mysql_executor.h"
 #include "trpc/client/mysql/executor/mysql_statement.h"
@@ -88,10 +87,18 @@ mysql> select * from users;
 +----+----------+-------------------+---------------------+------------+
 */
 
-std::string db_ip = "127.0.0.1";
+trpc::mysql::MysqlConnOption option = {
+        "127.0.0.1",
+        "root",
+        "abc123",
+        "test",
+        3306,
+        "utf8mb4"
+
+};
 
 TEST(Executor, QueryNoArgs) {
-  trpc::mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  trpc::mysql::MysqlExecutor conn(option);
   trpc::mysql::MysqlResults<int, std::string, trpc::mysql::MysqlTime> res;
   conn.Connect();
   conn.QueryAll(res, "select id, username, created_at from users");
@@ -107,7 +114,7 @@ TEST(Executor, QueryNoArgs) {
 }
 
 TEST(Executor, QueryString) {
-  trpc::mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  trpc::mysql::MysqlExecutor conn(option);
   trpc::mysql::MysqlResults<trpc::mysql::NativeString> res;
   conn.Connect();
   conn.QueryAll(res, "select * from users where id > ? or username = ?", 1, "alice");
@@ -118,7 +125,7 @@ TEST(Executor, QueryString) {
 }
 //
 TEST(Executor, QueryNull) {
-  trpc::mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  trpc::mysql::MysqlExecutor conn(option);
   trpc::mysql::MysqlResults<std::string, std::string> res;
   conn.Connect();
   conn.QueryAll(res, "select username, email from users");
@@ -130,7 +137,7 @@ TEST(Executor, QueryNull) {
 }
 
 TEST(Executor, QueryArgs) {
-  trpc::mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  trpc::mysql::MysqlExecutor conn(option);
   trpc::mysql::MysqlResults<int, std::string, trpc::mysql::MysqlTime> res;
   conn.Connect();
   conn.QueryAll(res, "select id, email, created_at from users where id = ? or username = ?", 1, "carol");
@@ -143,7 +150,7 @@ TEST(Executor, QueryArgs) {
 }
 
 TEST(Executor, Update) {
-  trpc::mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  trpc::mysql::MysqlExecutor conn(option);
   trpc::mysql::MysqlResults<trpc::mysql::OnlyExec> res;
   conn.Connect();
   conn.Execute(res,
@@ -160,7 +167,7 @@ TEST(Executor, Update) {
 }
 
 TEST(Executor, Insert) {
-  trpc::mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  trpc::mysql::MysqlExecutor conn(option);
   trpc::mysql::MysqlResults<trpc::mysql::OnlyExec> res;
   mysql::MysqlTime mtime, mtime2;
   mtime.SetYear(2024).SetMonth(10).SetDay(10).SetHour(22);
@@ -175,7 +182,7 @@ TEST(Executor, Insert) {
 }
 
 TEST(Executor, Delete) {
-  trpc::mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  trpc::mysql::MysqlExecutor conn(option);
   trpc::mysql::MysqlResults<trpc::mysql::OnlyExec> res;
   conn.Connect();
   conn.Execute(res, "delete from users where username = \"jack\"");
@@ -184,7 +191,7 @@ TEST(Executor, Delete) {
 }
 
 TEST(Executor, SynaxError) {
-  trpc::mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  trpc::mysql::MysqlExecutor conn(option);
   trpc::mysql::MysqlResults<trpc::mysql::OnlyExec> res;
   conn.Connect();
   conn.Execute(res, "delete users where username = \"jack\"");
@@ -194,7 +201,7 @@ TEST(Executor, SynaxError) {
 }
 
 TEST(Executor, OutputArgsError) {
-  mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  mysql::MysqlExecutor conn(option);
   mysql::MysqlResults<int, std::string> res;
   conn.Connect();
   conn.QueryAll(res, "select * from users");
@@ -204,7 +211,7 @@ TEST(Executor, OutputArgsError) {
 }
 
 TEST(Executor, BLOB) {
-  mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  mysql::MysqlExecutor conn(option);
   mysql::MysqlResults<mysql::OnlyExec> exec_res;
   mysql::MysqlResults<mysql::MysqlBlob> special_res;
   mysql::MysqlResults<mysql::NativeString> str_res;
@@ -234,7 +241,7 @@ TEST(Executor, BLOB) {
 }
 
 TEST(Executor, TimeType) {
-  mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  mysql::MysqlExecutor conn(option);
   mysql::MysqlResults<int, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime,
                       mysql::MysqlTime>
       res;
@@ -253,7 +260,7 @@ TEST(Executor, TimeType) {
 }
 
 TEST(Executor, StringType) {
-  mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  mysql::MysqlExecutor conn(option);
   mysql::MysqlResults<int, std::string, std::string, std::string, std::string, std::string, std::string> res;
   mysql::MysqlResults<mysql::NativeString> res2;
   mysql::MysqlResults<mysql::OnlyExec> res4;
@@ -269,7 +276,7 @@ TEST(Executor, StringType) {
 }
 
 TEST(Executor, Transaction) {
-  mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  mysql::MysqlExecutor conn(option);
   mysql::MysqlResults<mysql::OnlyExec> exec_res;
 
   conn.Connect();
@@ -284,7 +291,7 @@ TEST(Executor, Transaction) {
 }
 
 TEST(Executor, GetResultSet) {
-  mysql::MysqlExecutor conn(db_ip, "root", "abc123", "test", 3306);
+  mysql::MysqlExecutor conn(option);
 
   mysql::MysqlResults<int, std::string, trpc::mysql::MysqlTime> res;
   mysql::MysqlResults<mysql::NativeString> res2;

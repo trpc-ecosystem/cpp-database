@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -17,22 +17,21 @@
 namespace trpc::mysql {
 
 std::mutex MysqlExecutor::mysql_mutex;
+constexpr unsigned int TRPC_MYSQL_API_TIMEOUT = 5;
+constexpr int RECONNECT_INIT_RETRY_INTERVAL = 100;
+constexpr int RECONNECT_MAX_RETRY = 5;
 
-MysqlExecutor::MysqlExecutor(const std::string& hostname, const std::string& username, const std::string& password,
-                             const std::string& database, uint16_t port, const std::string& char_set)
+
+MysqlExecutor::MysqlExecutor(const MysqlConnOption& option)
     : is_connected(false),
-      hostname_(hostname),
-      username_(username),
-      password_(password),
-      database_(database),
-      port_(port) {
+      option_(option) {
   {
     std::lock_guard<std::mutex> lock(mysql_mutex);
     mysql_ = mysql_init(nullptr);
   }
-  mysql_set_character_set(mysql_, char_set.c_str());
+  mysql_set_character_set(mysql_, option_.char_set.c_str());
 
-  unsigned int timeout = 5;
+  unsigned int timeout = TRPC_MYSQL_API_TIMEOUT;
   mysql_options(mysql_, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
   mysql_options(mysql_, MYSQL_OPT_READ_TIMEOUT, &timeout);
   mysql_options(mysql_, MYSQL_OPT_WRITE_TIMEOUT, &timeout);
@@ -49,8 +48,9 @@ bool MysqlExecutor::Connect() {
     mysql_ = mysql_init(nullptr);
   }
 
-  MYSQL* ret = mysql_real_connect(mysql_, hostname_.c_str(), username_.c_str(), password_.c_str(), database_.c_str(),
-                                  port_, nullptr, 0);
+  MYSQL* ret = mysql_real_connect(mysql_, option_.hostname.c_str(), option_.username.c_str(),
+                                  option_.password.c_str(), option_.database.c_str(),
+                                  option_.port, nullptr, 0);
 
   if (nullptr == ret) {
     mysql_close(mysql_);
@@ -76,34 +76,52 @@ void MysqlExecutor::Close() {
   is_connected = false;
 }
 
-ExecuteStatus MysqlExecutor::ExecuteStatement(std::vector<MYSQL_BIND>& output_binds, MysqlStatement& statement) {
-  if (!IsConnectionValid()) {
+Status MysqlExecutor::ExecuteStatement(std::vector<MYSQL_BIND>& output_binds, MysqlStatement& statement) {
+  Status s;
+  if (!CheckAlive()) {
     if (!StartReconnect()) {
-      return ExecuteStatus(false, "MySQL cluster is unavailable.");
+      // Get error from mysql_ not statement.
+      s.SetFrameworkRetCode(GetErrorNumber());
+      s.SetErrorMessage(GetErrorMessage());
+      return s;
     }
   }
-  if (mysql_stmt_bind_result(statement.STMTPointer(), output_binds.data()) != 0) return false;
-  if (mysql_stmt_execute(statement.STMTPointer()) != 0) {
-    return ExecuteStatus(false, statement.GetErrorMessage());
+
+  if (mysql_stmt_bind_result(statement.STMTPointer(), output_binds.data()) != 0) {
+    s.SetFrameworkRetCode(statement.GetErrorNumber());
+    s.SetErrorMessage(statement.GetErrorMessage());
+    return s;
   }
 
-  return ExecuteStatus(true);
+  if (mysql_stmt_execute(statement.STMTPointer()) != 0) {
+    s.SetFrameworkRetCode(statement.GetErrorNumber());
+    s.SetErrorMessage(statement.GetErrorMessage());
+    return s;
+  }
+
+  return s;
 }
 
-ExecuteStatus MysqlExecutor::ExecuteStatement(MysqlStatement& statement) {
-  if (!IsConnectionValid()) {
+Status MysqlExecutor::ExecuteStatement(MysqlStatement& statement) {
+  Status s;
+  if (!CheckAlive()) {
     if (!StartReconnect()) {
-      return ExecuteStatus(false, "MySQL cluster is unavailable.");
+      // Get error from mysql_ not statement.
+      s.SetFrameworkRetCode(GetErrorNumber());
+      s.SetErrorMessage(GetErrorMessage());
+      return s;
     }
   }
   if (mysql_stmt_execute(statement.STMTPointer()) != 0) {
-    return ExecuteStatus(false, statement.GetErrorMessage());
+    s.SetFrameworkRetCode(statement.GetErrorNumber());
+    s.SetErrorMessage(statement.GetErrorMessage());
+    return s;
   }
 
-  return ExecuteStatus(true);
+  return s;
 }
 
-uint64_t MysqlExecutor::GetAliveTime() {
+uint64_t MysqlExecutor::GetAliveTime() const {
   uint64_t now = trpc::GetSteadyMilliSeconds();
   uint64_t alive_time = now - m_alivetime;
   return alive_time;
@@ -112,10 +130,9 @@ uint64_t MysqlExecutor::GetAliveTime() {
 void MysqlExecutor::RefreshAliveTime() { m_alivetime = trpc::GetSteadyMilliSeconds(); }
 
 bool MysqlExecutor::StartReconnect() {
-  int retry_interval = 100;
-  int max_retries = 5;
+  int retry_interval = RECONNECT_INIT_RETRY_INTERVAL;
   bool reconnected = false;
-  for (int i = 0; i < max_retries; ++i) {
+  for (int i = 0; i < RECONNECT_MAX_RETRY; ++i) {
     if (Reconnect()) {
       reconnected = true;
       break;
@@ -128,7 +145,7 @@ bool MysqlExecutor::StartReconnect() {
 
 bool MysqlExecutor::Reconnect() { return Connect(); }
 
-bool MysqlExecutor::IsConnectionValid() {
+bool MysqlExecutor::CheckAlive() {
   if(!is_connected)
       return false;
 
@@ -142,7 +159,8 @@ bool MysqlExecutor::IsConnectionValid() {
 
 size_t MysqlExecutor::ExecuteInternal(const std::string& query, MysqlResults<OnlyExec>& mysql_results) {
   if (mysql_real_query(mysql_, query.c_str(), query.length()) != 0) {
-    mysql_results.SetErrorMessage(mysql_error(mysql_));
+    mysql_results.SetErrorMessage(GetErrorMessage());
+    mysql_results.SetErrorNumber(GetErrorNumber());
     return 0;
   }
 
@@ -158,24 +176,34 @@ uint64_t MysqlExecutor::GetExecutorId() const {
 }
 
 std::string MysqlExecutor::GetIp() const {
-  return hostname_;
+  return option_.hostname;
 }
 
 uint16_t MysqlExecutor::GetPort() const {
-  return port_;
+  return option_.port;
+}
+
+int MysqlExecutor::GetErrorNumber() {
+  return mysql_errno(mysql_);
 }
 
 std::string MysqlExecutor::GetErrorMessage() {
   return mysql_error(mysql_);
 }
 
-bool MysqlExecutor::Autocommit(bool mode) {
+bool MysqlExecutor::AutoCommit(bool mode) {
   unsigned mode_n = mode ? 1 : 0;
+
+  // Sets autocommit mode on if mode_n is 1, off if mode is 0.
   if(mysql_autocommit(mysql_, mode_n) != 0)
     return false;
 
   auto_commit_ = mode;
   return true;
+}
+
+bool MysqlExecutor::IsConnected() {
+  return is_connected;
 }
 
 }  // namespace trpc::mysql

@@ -343,7 +343,7 @@ consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
 
-Open Source Software Licensed under the MIT License and Other Licenses of the Third-Party Components therein:
+Open Source Software Licensed under the GPLv2 of the Third-Party Components therein:
 --------------------------------------------------------------------
 1. MySQL
 Copyright (C) 1995, 2024 Oracle and/or its affiliates. All rights reserved.

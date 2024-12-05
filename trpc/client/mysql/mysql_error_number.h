@@ -11,24 +11,17 @@
 //
 //
 
-#include "mysql_protocol.h"
+#pragma once
+
+#include "trpc/common/status.h"
 
 namespace trpc::mysql {
 
-bool MySQLRequestProtocol::ZeroCopyDecode(NoncontiguousBuffer &buff) {
-  return true;
-}
+/// The error numbers are the same with MySQL https://dev.mysql.com/doc/mysql-errors/8.0/en/error-reference-introduction.html
+/// except below
 
-bool MySQLRequestProtocol::ZeroCopyEncode(NoncontiguousBuffer &buff) {
-  return true;
-}
-
-
-bool MySQLResponseProtocol::ZeroCopyDecode(NoncontiguousBuffer &buff) {
-  return true;
-}
-
-bool MySQLResponseProtocol::ZeroCopyEncode(NoncontiguousBuffer &buff) {
-  return true;
-}
+enum TrpcMysqlRetCode : int {
+  TRPC_MYSQL_INVALID_HANDLE = 3502,
+  TRPC_MYSQL_STMT_PARAMS_ERROR = 3503
+};
 }

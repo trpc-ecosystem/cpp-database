@@ -2,12 +2,12 @@
 //
 // Tencent is pleased to support the open source community by making tRPC available.
 //
-// Copyright (C) 2023 THL A29 Limited, a Tencent company.
+// Copyright (C) 2024 THL A29 Limited, a Tencent company.
 // All rights reserved.
 //
 // If you have downloaded a copy of the tRPC source code from Tencent,
-// please note that tRPC source code is licensed under the  Apache 2.0 License,
-// A copy of the Apache 2.0 License is included in this file.
+// please note that tRPC source code is licensed under the GNU General Public License Version 2.0 (GPLv2),
+// A copy of the GPLv2 is included in this file.
 //
 //
 
@@ -51,8 +51,13 @@ std::string MysqlStatement::GetErrorMessage() {
   return "";
 }
 
-bool MysqlStatement::BindParam(std::vector<MYSQL_BIND> &bind_list) {
+int MysqlStatement::GetErrorNumber() {
+  if(mysql_stmt_ != nullptr)
+    return mysql_stmt_errno(mysql_stmt_);
+  return 0;
+}
 
+bool MysqlStatement::BindParam(std::vector<MYSQL_BIND> &bind_list) {
   return mysql_stmt_bind_param(mysql_stmt_, bind_list.data()) == 0? true : false;
 }
 

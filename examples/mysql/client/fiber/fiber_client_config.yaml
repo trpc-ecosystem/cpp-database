@@ -20,7 +20,7 @@ client:
         char_set: "utf8mb4"
         num_shard_group: 4
         thread_num: 4
-        thread_bind_core: false
+        thread_bind_core: "0, 3-5"
 
 
 plugins:

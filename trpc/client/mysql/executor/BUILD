@@ -8,7 +8,8 @@ cc_library(
     hdrs = ["mysql_statement.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "@mysqlclient//:mysqlclient"
+        "@mysqlclient//:mysqlclient",
+        "@trpc_cpp//trpc/util/log:logging"
     ]
 )
 
@@ -19,7 +20,8 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@mysqlclient//:mysqlclient",
-        "@trpc_cpp//trpc/util:time"
+        "@trpc_cpp//trpc/util:time",
+        "@trpc_cpp//trpc/util/log:logging"
     ],
 )
 
@@ -29,15 +31,16 @@ cc_library(
     srcs = [ "mysql_binder.cc"],
     deps = [
         ":mysql_type",
+        "@trpc_cpp//trpc/util:string_util",
     ],
 )
 
 cc_library(
     name = "mysql_results",
-    srcs = ["mysql_results.cc"],
     hdrs = ["mysql_results.h"],
     deps = [
         "@mysqlclient//:mysqlclient",
+        "//trpc/client/mysql:mysql_error_number",
         ":mysql_binder"
         ],
     visibility = ["//visibility:public"]
@@ -54,7 +57,7 @@ cc_library(
         "@trpc_cpp//trpc/util:time",
         "@trpc_cpp//trpc/util:ref_ptr",
         "@trpc_cpp//trpc/util/log:logging",
-        "@trpc_cpp//trpc/util:string_util"
+        "@trpc_cpp//trpc/util:string_util",
     ],
     visibility = ["//visibility:public"],
 )
