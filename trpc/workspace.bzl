@@ -8,7 +8,7 @@ def clean_dep(dep):
     return str(Label(dep))
 
 # buildifier: disable=function-docstring-args
-def database_mysql_workspace(path_prefix = "", repo_name = "", **kwargs):
+def trpc_database_mysql_workspace(path_prefix = "", repo_name = "", **kwargs):
     """Build rules for the trpc project
 
     Note: The main idea is to determine the required version of dependent software during the build process

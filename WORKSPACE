@@ -15,5 +15,5 @@ git_repository(
 load("@trpc_cpp//trpc:workspace.bzl", "trpc_workspace")
 trpc_workspace()
 
-load("//trpc:workspace.bzl", "database_mysql_workspace")
-database_mysql_workspace()
+load("//trpc:workspace.bzl", "trpc_database_mysql_workspace")
+trpc_database_mysql_workspace()
