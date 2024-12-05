@@ -191,7 +191,7 @@ std::string MysqlExecutor::GetErrorMessage() {
   return mysql_error(mysql_);
 }
 
-bool MysqlExecutor::Autocommit(bool mode) {
+bool MysqlExecutor::AutoCommit(bool mode) {
   unsigned mode_n = mode ? 1 : 0;
 
   // Sets autocommit mode on if mode_n is 1, off if mode is 0.

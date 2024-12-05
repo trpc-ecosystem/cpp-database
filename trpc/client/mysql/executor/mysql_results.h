@@ -24,9 +24,13 @@
 
 namespace trpc::mysql {
 
-class MysqlResultsOption {
- public:
-  size_t dynamic_buffer_init_size = 64;
+constexpr size_t kDynamicBufferInitSize =64;
+
+struct MysqlResultsOption {
+  // The initial size of the buffer used to store variable-length data
+  // when fetching a row in BindType mode.
+  // In many real-world applications, 64 bytes is sufficient to store common variable-length data
+  size_t dynamic_buffer_init_size = kDynamicBufferInitSize;
 };
 
 
@@ -37,9 +41,13 @@ class NativeString {};
 
 /// @brief Mode for `MysqlResults`
 enum class MysqlResultsMode {
-  BindType,      // Bind query result data to tuples.
-  OnlyExec,      // For SQL which will not return a result set data.
-  NativeString,  // Return result data as vector of string_view.
+  // Bind query result data to tuples.
+  BindType,
+  // For SQL which will not return a result set data. But can get the
+  // num of affected rows by GetAffectedRowNum()
+  OnlyExec,
+  // Return result data as vector of string_view.
+  NativeString,
 };
 
 
@@ -65,7 +73,7 @@ struct ResultSetMapper<OnlyExec> {
 
 
 ///
-///@brief A class used to store the results of a MySQL query executed by the MysqlConnection class.
+///@brief A class used to store the results of a MySQL query executed by the MysqlExecutor class.
 ///
 /// The class template parameter `Args...` is used to define the types of data stored in the result set.
 ///
@@ -73,7 +81,7 @@ struct ResultSetMapper<OnlyExec> {
 ///  that execute without returning a result set (e.g., INSERT, UPDATE).
 ///
 ///- If `Args...` is `NativeString`, the class handles operations that
-///  return a `vector<vector<string>>>` result set.
+///  return a `vector<vector<string_view>>>` result set.
 ///
 ///- If `Args...` includes common data types (e.g., int, std::string),
 ///  the class handles operations that return a `vector<tuple<Args...>>` result set.

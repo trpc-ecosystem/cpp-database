@@ -30,6 +30,7 @@ cc_library(
     srcs = [ "mysql_binder.cc"],
     deps = [
         ":mysql_type",
+        "@trpc_cpp//trpc/util:string_util",
     ],
 )
 

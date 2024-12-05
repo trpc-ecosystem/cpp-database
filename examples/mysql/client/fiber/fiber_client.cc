@@ -328,6 +328,7 @@ void TestError(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
 
   // bind type error, we use int to receive a string
   MysqlResults<int> invalid_template_res;
+  ctx = trpc::MakeClientContext(proxy);
   s = proxy->Query(ctx, invalid_template_res, "select email from users where username = ?", "alice");
   if(!s.OK()) {
     std::cout << s.ToString() << std::endl;
@@ -336,6 +337,7 @@ void TestError(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
 
   // template args do not match result
   MysqlResults<int, std::string> too_less_args_res;
+  ctx = trpc::MakeClientContext(proxy);
   s = proxy->Query(ctx, too_less_args_res, "select id, email, username from users where username = ?", "alice");
   if(!s.OK()) {
     std::cout << s.ToString() << std::endl;

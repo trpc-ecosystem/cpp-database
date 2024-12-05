@@ -20,9 +20,9 @@
 #include <vector>
 #include <iostream>
 #include "trpc/client/mysql/executor/mysql_type.h"
+#include "trpc/util/string_util.h"
 #include <unordered_set>
 
-//#define TRPC_MYSQL_BIND_POINTER_CAST(v) (const_cast<void*>(static_cast<const void*>(v)))
 
 namespace trpc::mysql {
 
@@ -146,10 +146,11 @@ inline void BindInputImpl(std::vector<MYSQL_BIND>& binds, const InputArgs&... ar
 // Output Bind
 // ***********
 
+constexpr int TRPC_BIND_BUFFER_MIN_SIZE = 32;
+
+/// @note the buffer.buffer_type has been set before this function
 template <typename T>
 inline void StepOutputBind(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uint8_t& null_flag) {
-  bind.buffer_type = MysqlInputType<T>::value;
-  bind.is_unsigned = MysqlInputType<T>::is_unsigned;
   buffer.resize(sizeof(T));
   bind.buffer = buffer.data();
   bind.is_null = reinterpret_cast<bool*>(&null_flag);
@@ -157,9 +158,8 @@ inline void StepOutputBind(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uin
 
 template <>
 inline void StepOutputBind<std::string>(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uint8_t& null_flag) {
-  bind.buffer_type = MYSQL_TYPE_STRING;
   if (buffer.empty()) {
-    buffer.resize(32);  // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
+    buffer.resize(TRPC_BIND_BUFFER_MIN_SIZE);  // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
   }
   bind.buffer = buffer.data();
   bind.is_null = reinterpret_cast<bool*>(&null_flag);
@@ -168,9 +168,8 @@ inline void StepOutputBind<std::string>(MYSQL_BIND& bind, std::vector<std::byte>
 
 template <>
 inline void StepOutputBind<MysqlBlob>(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uint8_t& null_flag) {
-  bind.buffer_type = MYSQL_TYPE_BLOB;
   if (buffer.empty()) {
-    buffer.resize(32); // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
+    buffer.resize(TRPC_BIND_BUFFER_MIN_SIZE); // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
   }
   bind.buffer = buffer.data();
   bind.is_null = reinterpret_cast<bool*>(&null_flag);
@@ -184,6 +183,35 @@ inline void BindOutputImpl(std::vector<MYSQL_BIND>& output_binds,
 
   size_t i = 0;
   ((StepOutputBind<OutputArgs>(output_binds[i], output_buffers[i], null_flag_buffer[i]), i++), ...);
+}
+
+
+template <typename... Args>
+inline std::string CheckFieldsOutputArgs(MYSQL_RES* res) {
+  std::string error;
+  unsigned int num_fields = mysql_num_fields(res);
+  if(num_fields != sizeof ...(Args)) {
+    error = util::FormatString("The query field count is {}, but you give {} OutputArgs.",
+                              num_fields, sizeof...(Args));
+    return error;
+  }
+
+  MYSQL_FIELD* fields_meta = mysql_fetch_fields(res);
+
+  unsigned long i = 0;
+  std::vector<unsigned long> failed_index;
+
+  ((OutputTypeValid<Args>(fields_meta[i].type) ? (void)i++ : failed_index.push_back(i++)), ...);
+
+  if(!failed_index.empty()) {
+    error = "Bind output type warning for fields: (";
+    error += std::string(fields_meta[failed_index[0]].name);
+    for(i = 1; i < failed_index.size(); i++)
+      error.append(", ").append(fields_meta[failed_index[i]].name);
+    error.append(").");
+    return error;
+  }
+  return "";
 }
 
 

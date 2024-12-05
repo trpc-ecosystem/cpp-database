@@ -16,7 +16,6 @@
 
 #include "include/gtest/gtest.h"
 
-//#define private public
 
 #include "trpc/client/mysql/executor/mysql_executor.h"
 #include "trpc/client/mysql/executor/mysql_statement.h"

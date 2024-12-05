@@ -21,7 +21,6 @@ namespace trpc::mysql {
 /// except below
 
 enum TrpcMysqlRetCode : int {
-  TRPC_MYSQL_DB_CONNECTION_ERR = 3501,
   TRPC_MYSQL_INVALID_HANDLE = 3502,
   TRPC_MYSQL_STMT_PARAMS_ERROR = 3503
 };
