@@ -22,9 +22,14 @@
 #include "trpc/client/mysql/executor/mysql_type.h"
 #include <unordered_set>
 
-#define BIND_POINTER_CAST(v) (const_cast<void*>(static_cast<const void*>(v)))
+//#define TRPC_MYSQL_BIND_POINTER_CAST(v) (const_cast<void*>(static_cast<const void*>(v)))
 
 namespace trpc::mysql {
+
+template <typename T>
+void* BindPointerCast(const T* ptr) {
+  return const_cast<void*>(static_cast<const void*>(ptr));
+}
 
 ///@brief map type information for mysql api
 template <typename T>
@@ -41,7 +46,7 @@ struct MysqlInputType {
     static constexpr bool is_unsigned = is_unsigned_type;                      \
   };
 
-
+// Used for `StepInputBind(MYSQL_BIND& bind, const T& value)`
 MYSQL_INPUT_TYPE_SPECIALIZATION(int8_t, MYSQL_TYPE_TINY, false)
 MYSQL_INPUT_TYPE_SPECIALIZATION(uint8_t, MYSQL_TYPE_TINY, true)
 MYSQL_INPUT_TYPE_SPECIALIZATION(int16_t, MYSQL_TYPE_SHORT, false)
@@ -52,7 +57,7 @@ MYSQL_INPUT_TYPE_SPECIALIZATION(int64_t, MYSQL_TYPE_LONGLONG, false)
 MYSQL_INPUT_TYPE_SPECIALIZATION(uint64_t, MYSQL_TYPE_LONGLONG, true)
 MYSQL_INPUT_TYPE_SPECIALIZATION(float, MYSQL_TYPE_FLOAT, false)
 MYSQL_INPUT_TYPE_SPECIALIZATION(double, MYSQL_TYPE_DOUBLE, false)
-MYSQL_INPUT_TYPE_SPECIALIZATION(MysqlTime, MYSQL_TYPE_DATETIME, true)
+//MYSQL_INPUT_TYPE_SPECIALIZATION(MysqlTime, MYSQL_TYPE_DATETIME, true)
 
 
 
@@ -92,11 +97,12 @@ inline bool OutputTypeValid(enum_field_types mysql_type) {
 // Input Bind
 // ***********
 
+/// @brief enable_if to bypass types convertible to std::string_view like char*.
 template <typename T, typename = std::enable_if_t<!std::is_convertible<T, std::string_view>::value>>
 inline void StepInputBind(MYSQL_BIND& bind, const T& value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MysqlInputType<T>::value;
-  bind.buffer = BIND_POINTER_CAST(&value);
+  bind.buffer = BindPointerCast(&value);
   bind.is_unsigned = MysqlInputType<T>::is_unsigned;
 }
 
@@ -104,17 +110,18 @@ inline void StepInputBind(MYSQL_BIND& bind, const T& value) {
 inline void StepInputBind(MYSQL_BIND& bind, const MysqlBlob& value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MYSQL_TYPE_BLOB;
-  bind.buffer = BIND_POINTER_CAST(value.DataConstPtr());
+  bind.buffer = BindPointerCast(value.DataConstPtr());
   bind.buffer_length = value.Size();
   bind.length = &bind.buffer_length;
   bind.is_unsigned = false;
 }
 
-
+/// @brief Overload for MysqlTime. This avoids relying on the general template
+/// to prevent issues if the MysqlTime class changes and value.DataConstPtr() != &value.
 inline void StepInputBind(MYSQL_BIND& bind, const MysqlTime& value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MYSQL_TYPE_DATETIME;
-  bind.buffer = BIND_POINTER_CAST(value.DataConstPtr());
+  bind.buffer = BindPointerCast(value.DataConstPtr());
   bind.is_unsigned = true;
 }
 
@@ -122,7 +129,7 @@ inline void StepInputBind(MYSQL_BIND& bind, const MysqlTime& value) {
 inline void StepInputBind(MYSQL_BIND& bind, std::string_view value) {
   std::memset(&bind, 0, sizeof(bind));
   bind.buffer_type = MYSQL_TYPE_STRING;
-  bind.buffer = BIND_POINTER_CAST(value.data());
+  bind.buffer = BindPointerCast(value.data());
   bind.buffer_length = value.length();
   bind.length = &bind.buffer_length;
   bind.is_unsigned = false;

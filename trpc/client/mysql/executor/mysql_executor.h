@@ -309,6 +309,8 @@ void MysqlExecutor::BindInputArgs(std::vector<MYSQL_BIND>& params, const InputAr
 
 template <typename... OutputArgs>
 void MysqlExecutor::BindOutputs(MysqlExecutor::QueryHandle<OutputArgs...>& handle) {
+//  MYSQL_RES* meta = handle.statement->GetResultsMeta();
+
   BindOutputImpl<OutputArgs...>(*handle.output_binds, *handle.output_buffer, *handle.null_flag_buffer);
 }
 
@@ -343,6 +345,8 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
     return false;
   }
 
+  mysql_results.CheckFieldsType(stmt.GetResultsMeta());
+
   BindInputArgs(input_binds, args...);
 
   if (!stmt.BindParam(input_binds)) {
@@ -375,7 +379,6 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   }
 
   mysql_results.SetFieldsName(stmt.GetResultsMeta());
-  mysql_results.CheckFieldsType(stmt.GetResultsMeta());
   stmt.CloseStatement();
   return true;
 }

@@ -116,7 +116,7 @@ void TestAsyncQuery(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
 
 void TestAsyncTx(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
   MysqlResults<NativeString> query_res;
-  TxHandlePtr handle;
+  TxHandlePtr handle = nullptr;
   trpc::ClientContextPtr ctx = trpc::MakeClientContext(proxy);
   proxy->Query(ctx, query_res, "select * from users");
 
@@ -126,7 +126,8 @@ void TestAsyncTx(std::shared_ptr<trpc::mysql::MysqlServiceProxy>& proxy) {
             if(f.IsFailed())
               return trpc::MakeExceptionFuture<>(f.GetException());
 
-            // Get the ref counted handle here.
+            // Get the ref counted handle ptr here.
+            // Or you can return Future<TxHandlePtr> and get the handle outside.
             handle = f.GetValue0();
             return trpc::MakeReadyFuture<>();
           });

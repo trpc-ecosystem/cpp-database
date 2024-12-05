@@ -163,7 +163,7 @@ class MysqlResults {
   bool has_value_;
 
   /// @brief For NativeString, it will represent real data.
-  MYSQL_RES* mysql_res_;
+  MYSQL_RES* mysql_res_{nullptr};
 };
 
 template <typename... Args>

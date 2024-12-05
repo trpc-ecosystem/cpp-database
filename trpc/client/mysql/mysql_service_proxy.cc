@@ -51,7 +51,7 @@ bool MysqlServiceProxy::InitThreadPool() {
   thread_pool_ = std::make_unique<::trpc::ThreadPool>(std::move(thread_pool_option));
   BindCoreManager::ParseBindCoreGroup(mysql_conf_.thread_bind_core);
   thread_pool_->Start();
-  BindCoreManager::ParseBindCoreGroup("");
+  BindCoreManager::ParseBindCoreGroup(""); // Reset config.
   return true;
 }
 
