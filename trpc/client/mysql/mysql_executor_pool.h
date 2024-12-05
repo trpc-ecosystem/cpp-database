@@ -45,6 +45,9 @@ class MysqlExecutorPool {
  public:
   MysqlExecutorPool(const MysqlExecutorPoolOption& option, const NodeAddr& node_addr);
 
+
+  /// @return An executor ptr. Need to use MysqlExecutor::IsConnected to check state.
+  ///  and can get error by MysqlExecutor::GetErrorMessage
   RefPtr<MysqlExecutor> GetExecutor();
 
   void Reclaim(int ret, RefPtr<MysqlExecutor>&&);

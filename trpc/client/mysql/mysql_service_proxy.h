@@ -173,7 +173,9 @@ class MysqlServiceProxy : public ServiceProxy {
 
  private:
   std::unique_ptr<ThreadPool> thread_pool_{nullptr};
+
   std::unique_ptr<MysqlExecutorPoolManager> pool_manager_{nullptr};
+
   MysqlClientConf mysql_conf_;
 };
 

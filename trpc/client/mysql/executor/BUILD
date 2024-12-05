@@ -20,7 +20,8 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@mysqlclient//:mysqlclient",
-        "@trpc_cpp//trpc/util:time"
+        "@trpc_cpp//trpc/util:time",
+        "@trpc_cpp//trpc/util/log:logging"
     ],
 )
 

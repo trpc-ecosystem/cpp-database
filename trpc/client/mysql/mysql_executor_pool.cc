@@ -16,8 +16,9 @@
 #include <thread>
 #include "trpc/client/mysql/executor/mysql_executor.h"
 
-namespace trpc {
-namespace mysql {
+namespace trpc::mysql {
+
+constexpr int EXECUTOR_POOL_CONN_RETRY_NUM = 3;
 
 MysqlExecutorPool::MysqlExecutorPool(const MysqlExecutorPoolOption& option, const NodeAddr& node_addr)
     : pool_option_(option), target_((node_addr)){
@@ -30,7 +31,7 @@ RefPtr<MysqlExecutor> MysqlExecutorPool::GetOrCreate() {
   RefPtr<MysqlExecutor> idle_executor{nullptr};
 
   uint32_t shard_id = shard_id_gen_.fetch_add(1);
-  int retry_num = 3;
+  int retry_num = EXECUTOR_POOL_CONN_RETRY_NUM;
 
   while (retry_num > 0) {
     auto& shard = executor_shards_[shard_id % pool_option_.num_shard_group];
@@ -158,5 +159,4 @@ bool MysqlExecutorPool::IsIdleTimeout(RefPtr<MysqlExecutor> executor) {
 }
 
 
-}  // namespace mysql
-}  // namespace trpc
+}

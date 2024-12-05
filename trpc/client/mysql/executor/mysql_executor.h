@@ -112,11 +112,15 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
 
    public:
     MysqlResults<OutputArgs...>* mysql_results = nullptr;
+
     MysqlStatement* statement = nullptr;
 
     std::unique_ptr<std::vector<MYSQL_BIND>> output_binds;
+
     std::unique_ptr<DataBufferT> output_buffer;
+
     std::unique_ptr<std::vector<unsigned long>> output_length;
+
     std::unique_ptr<FlagBufferT> null_flag_buffer;
 
     // Indicate which column are variable-length data. It will be used in MysqlExecutor::FetchTruncatedResults.
@@ -136,8 +140,11 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
   ~MysqlExecutor();
 
   MysqlExecutor(const MysqlExecutor& rhs) = delete;
+
   MysqlExecutor(MysqlExecutor&& rhs) = delete;
+
   MysqlExecutor& operator=(const MysqlExecutor& rhs) = delete;
+
   MysqlExecutor& operator=(MysqlExecutor&& rhs) = delete;
 
   ///@brief Connect to mysql server.

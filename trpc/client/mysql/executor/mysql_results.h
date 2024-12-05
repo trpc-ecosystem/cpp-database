@@ -20,6 +20,7 @@
 #include "mysqlclient/mysql.h"
 #include "mysql_binder.h"
 #include "trpc/client/mysql/mysql_error_number.h"
+#include "trpc/util/log/logging.h"
 
 
 namespace trpc::mysql {
@@ -139,11 +140,12 @@ class MysqlResults {
   int GetErrorNumber() const;
 
  private:
+
+  /// @brief Used for NativeString to the mysql_res_.
+  /// @note  Must be called after Clear().
   void SetRawMysqlRes(MYSQL_RES* res);
 
   void SetFieldsName(MYSQL_RES* res);
-
-  bool CheckFieldsType(MYSQL_RES* res);
 
   size_t SetAffectedRows(size_t n_rows);
 
@@ -191,30 +193,6 @@ void MysqlResults<Args...>::SetFieldsName(MYSQL_RES* res) {
 }
 
 template <typename... Args>
-bool MysqlResults<Args...>::CheckFieldsType(MYSQL_RES* res) {
-  MYSQL_FIELD* fields_meta = mysql_fetch_fields(res);
-
-  unsigned long i = 0;
-  std::vector<unsigned long> failed_index;
-
-  // There is no need to check the length of fields_meta and Args
-  // because they should have been checked in the caller(e.g. QueryAllInternal)
-  ((OutputTypeValid<Args>(fields_meta[i].type) ? (void)i++ : failed_index.push_back(i++)), ...);
-
-  if(!failed_index.empty()) {
-    std::string error = "Bind output type warning for fields: (";
-    error += std::string(fields_meta[failed_index[0]].name);
-    for(i = 1; i < failed_index.size(); i++)
-      error.append(", ").append(fields_meta[failed_index[i]].name);
-    error.append(").");
-    error_message_.append(error);
-    error_number_ = TrpcMysqlRetCode::TRPC_MYSQL_STMT_PARAMS_ERROR;
-    return false;
-  }
-  return true;
-}
-
-template <typename... Args>
 MysqlResults<Args...>& MysqlResults<Args...>::operator=(MysqlResults&& other) noexcept {
   if (this != &other) {
     option_ = std::move(other.option_);
@@ -246,6 +224,7 @@ MysqlResults<Args...>::MysqlResults(MysqlResults&& other) noexcept
 
 template <typename... Args>
 void MysqlResults<Args...>::SetRawMysqlRes(MYSQL_RES* res) {
+  TRPC_ASSERT(mysql_res_ == nullptr);
   mysql_res_ = res;
 }
 
@@ -347,6 +326,12 @@ size_t MysqlResults<Args...>::SetAffectedRows(size_t n_rows) {
 
 template <typename... Args>
 bool MysqlResults<Args...>::IsValueNull(size_t row_index, size_t col_index) const {
+  if(null_flags_.empty())
+    return false;
+
+  if(row_index >= null_flags_.size() || col_index >= null_flags_[0].size())
+    return false;
+
   return null_flags_[row_index][col_index];
 }
 

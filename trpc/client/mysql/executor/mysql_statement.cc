@@ -58,7 +58,6 @@ int MysqlStatement::GetErrorNumber() {
 }
 
 bool MysqlStatement::BindParam(std::vector<MYSQL_BIND> &bind_list) {
-
   return mysql_stmt_bind_param(mysql_stmt_, bind_list.data()) == 0? true : false;
 }
 

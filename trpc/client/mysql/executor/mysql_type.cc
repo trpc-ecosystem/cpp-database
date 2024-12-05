@@ -12,9 +12,9 @@
 //
 
 #include <sstream>
-#include <iomanip>
 #include "trpc/client/mysql/executor/mysql_type.h"
 #include "trpc/util/time.h"
+#include "trpc/util/log/logging.h"
 
 namespace trpc::mysql {
 
@@ -42,8 +42,11 @@ MysqlTime &MysqlTime::SetYear(unsigned int year) {
 }
 
 MysqlTime &MysqlTime::SetMonth(unsigned int month) {
-  if(month > 0 && month <= 12)
+  if(month > 0 && month <= 12) {
     mt_.month = month;
+  } else {
+    TRPC_FMT_ERROR("MysqlTime::SetMonth ({}) Failed.", month);
+  }
   return *this;
 }
 
@@ -53,20 +56,29 @@ MysqlTime &MysqlTime::SetDay(unsigned int day) {
 }
 
 MysqlTime &MysqlTime::SetHour(unsigned int hour) {
-  if(hour <= 24)
+  if(hour <= 24) {
     mt_.hour = hour;
+  } else {
+    TRPC_FMT_ERROR("MysqlTime::SetHour ({}) Failed.", hour);
+  }
   return *this;
 }
 
 MysqlTime &MysqlTime::SetMinute(unsigned int minute) {
-  if(minute <= 60)
+  if(minute <= 60) {
     mt_.minute = minute;
+  } else {
+    TRPC_FMT_ERROR("MysqlTime::SetMinute ({}) Failed.", minute);
+  }
   return *this;
 }
 
 MysqlTime &MysqlTime::SetSecond(unsigned int second) {
-  if(second <= 60)
+  if(second <= 60) {
     mt_.second = second;
+  } else {
+    TRPC_FMT_ERROR("MysqlTime::SetSecond ({}) Failed.", second);
+  }
   return *this;
 }
 
