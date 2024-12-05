@@ -9,7 +9,7 @@ git_repository(
 #    remote = "https://github.com/trpc-group/trpc-cpp.git",
 #    branch = "main",
     remote = "https://github.com/KosmosFult/trpc-cpp.git",
-    branch = "mysql-main"
+    branch = "mysql-main-repo"
 )
 
 load("@trpc_cpp//trpc:workspace.bzl", "trpc_workspace")
