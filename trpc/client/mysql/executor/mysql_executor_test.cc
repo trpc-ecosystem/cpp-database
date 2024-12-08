@@ -235,7 +235,7 @@ TEST(Executor, BLOB) {
 TEST(Executor, TimeType) {
   mysql::MysqlExecutor conn(option);
   mysql::MysqlResults<int, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime,
-                      mysql::MysqlTime>
+                      int16_t>
       res;
   mysql::MysqlResults<mysql::NativeString> res2;
 

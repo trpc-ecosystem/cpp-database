@@ -57,7 +57,10 @@ MYSQL_INPUT_TYPE_SPECIALIZATION(int64_t, MYSQL_TYPE_LONGLONG, false)
 MYSQL_INPUT_TYPE_SPECIALIZATION(uint64_t, MYSQL_TYPE_LONGLONG, true)
 MYSQL_INPUT_TYPE_SPECIALIZATION(float, MYSQL_TYPE_FLOAT, false)
 MYSQL_INPUT_TYPE_SPECIALIZATION(double, MYSQL_TYPE_DOUBLE, false)
-//MYSQL_INPUT_TYPE_SPECIALIZATION(MysqlTime, MYSQL_TYPE_DATETIME, true)
+MYSQL_INPUT_TYPE_SPECIALIZATION(std::string, MYSQL_TYPE_STRING, true)
+MYSQL_INPUT_TYPE_SPECIALIZATION(MysqlTime, MYSQL_TYPE_DATETIME, true)
+MYSQL_INPUT_TYPE_SPECIALIZATION(MysqlBlob, MYSQL_TYPE_BLOB, true)
+
 
 
 
@@ -148,7 +151,7 @@ inline void BindInputImpl(std::vector<MYSQL_BIND>& binds, const InputArgs&... ar
 
 constexpr int TRPC_BIND_BUFFER_MIN_SIZE = 32;
 
-/// @note the buffer.buffer_type has been set before this function
+/// @note the buffer.buffer_type has been set before this function according to the fields meta.
 template <typename T>
 inline void StepOutputBind(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uint8_t& null_flag) {
   buffer.resize(sizeof(T));
@@ -158,6 +161,11 @@ inline void StepOutputBind(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uin
 
 template <>
 inline void StepOutputBind<std::string>(MYSQL_BIND& bind, std::vector<std::byte>& buffer, uint8_t& null_flag) {
+  // Strings are a special case. If the output is received as a string, the buffer type must be explicitly set
+  // to MYSQL_TYPE_STRING. For example, if the field is of a date type, its buffer type is initially set to
+  // the corresponding date type. However, if the user intends to receive the field as a string, we must
+  // override the buffer type to MYSQL_TYPE_STRING to avoid errors.
+  bind.buffer_type = MYSQL_TYPE_STRING;
   if (buffer.empty()) {
     buffer.resize(TRPC_BIND_BUFFER_MIN_SIZE);  // buffer size will usually be set by MysqlExecutor::QueryHandle according to the MysqlResultsOption
   }
