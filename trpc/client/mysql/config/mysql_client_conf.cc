@@ -12,6 +12,7 @@
 //
 
 #include "trpc/client/mysql/config/mysql_client_conf.h"
+
 #include "trpc/util/log/logging.h"
 
 namespace trpc::mysql {

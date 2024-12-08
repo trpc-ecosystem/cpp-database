@@ -16,10 +16,9 @@
 
 #include "include/gtest/gtest.h"
 
-
 #include "trpc/client/mysql/executor/mysql_executor.h"
-#include "trpc/client/mysql/executor/mysql_statement.h"
 #include "trpc/util/random.h"
+
 namespace trpc::testing {
 
 mysql::MysqlBlob GenRandomBlob(std::size_t length) {
@@ -35,8 +34,7 @@ mysql::MysqlBlob GenRandomBlob(std::size_t length) {
 }
 
 void PrintResultTable(mysql::MysqlResults<mysql::NativeString>& res) {
-
-  std::vector<std::string> fields_name =  res.GetFieldsName();
+  std::vector<std::string> fields_name = res.GetFieldsName();
   bool flag = false;
   std::vector<size_t> column_widths;
   auto& res_set = res.ResultSet();
@@ -67,8 +65,8 @@ void PrintResultTable(mysql::MysqlResults<mysql::NativeString>& res) {
   std::cout << std::endl;
   std::cout << std::setfill(' ');
 
-  for(int i = 0; i < res_set.size(); i++) {
-    for(int j = 0; j < res_set[i].size(); j++) {
+  for (int i = 0; i < res_set.size(); i++) {
+    for (int j = 0; j < res_set[i].size(); j++) {
       std::cout << std::left << std::setw(column_widths[j] + 2) << (res.IsValueNull(i, j) ? "null" : res_set[i][j]);
     }
     std::cout << std::endl;
@@ -87,13 +85,8 @@ mysql> select * from users;
 +----+----------+-------------------+---------------------+------------+
 */
 
-trpc::mysql::MysqlConnOption option = {
-        "127.0.0.1",
-        "root",
-        "abc123",
-        "test",
-        3306,
-        "utf8mb4"
+trpc::mysql::MysqlConnOption option = {"127.0.0.1", "root",   "abc123", "test",
+                                       3306,        "utf8mb4"
 
 };
 
@@ -233,7 +226,6 @@ TEST(Executor, BLOB) {
   auto& meta_res2 = special_res.ResultSet();
   EXPECT_EQ(std::get<0>(meta_res2[0]), blob);
 
-
   conn.Execute(exec_res, "delete from users where username = ?", "jack");
   EXPECT_GE(1, exec_res.GetAffectedRowNum());
 
@@ -243,18 +235,20 @@ TEST(Executor, BLOB) {
 TEST(Executor, TimeType) {
   mysql::MysqlExecutor conn(option);
   mysql::MysqlResults<int, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime, mysql::MysqlTime,
-                      mysql::MysqlTime>
+                      int16_t>
       res;
   mysql::MysqlResults<mysql::NativeString> res2;
 
   conn.Connect();
   conn.QueryAll(res, "select * from time_example");
+  EXPECT_TRUE(res.OK());
   conn.QueryAll(res2, "select * from time_example");
-
+  EXPECT_TRUE(res2.OK());
 
   mysql::MysqlTime target_time;
   target_time.SetYear(2024).SetMonth(4).SetDay(22);
   conn.QueryAll(res2, "select * from time_example where event_date = ?", target_time);
+  EXPECT_TRUE(res2.OK());
 
   conn.Close();
 }

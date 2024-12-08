@@ -16,14 +16,12 @@
 #include <cstdint>
 #include <string>
 
-// #include "trpc/common/config/mysql_connect_pool_conf.h"
 #include "yaml-cpp/yaml.h"
 namespace trpc::mysql {
 
 /// @brief Client config for accessing mysql
 /// Mainly contains authentication information
 struct MysqlClientConf {
-
   /// @brief User nmae
   std::string user_name;
 
@@ -40,7 +38,7 @@ struct MysqlClientConf {
 
   // thread_bind_core for thread pool
   // An input example of '1,5-7' will be converted to a list of [1, 5, 6, 7].
-  std::string thread_bind_core{""};
+  std::string thread_bind_core;
 
   /// Only For MysqlExecutorPoolImpl
   uint32_t num_shard_group{4};

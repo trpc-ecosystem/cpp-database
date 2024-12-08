@@ -16,7 +16,7 @@
 namespace trpc::mysql {
 
 int MysqlClientCodec::ZeroCopyCheck(const ConnectionPtr& conn, NoncontiguousBuffer& in, std::deque<std::any>& out) {
-  return 1;
+  return 0;
 }
 
 bool MysqlClientCodec::ZeroCopyDecode(const ClientContextPtr&, std::any&& in, ProtocolPtr& out) { return true; }
@@ -34,4 +34,4 @@ ProtocolPtr MysqlClientCodec::CreateRequestPtr() { return std::make_shared<MySQL
 
 ProtocolPtr MysqlClientCodec::CreateResponsePtr() { return std::make_shared<MySQLResponseProtocol>(); }
 
-}  // namespace trpc
+}  // namespace trpc::mysql

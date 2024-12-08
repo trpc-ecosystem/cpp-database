@@ -12,16 +12,16 @@
 //
 
 #include "trpc/client/mysql/mysql_executor_pool.h"
+
 #include <stdexcept>
 #include <thread>
-#include "trpc/client/mysql/executor/mysql_executor.h"
 
 namespace trpc::mysql {
 
 constexpr int EXECUTOR_POOL_CONN_RETRY_NUM = 3;
 
 MysqlExecutorPool::MysqlExecutorPool(const MysqlExecutorPoolOption& option, const NodeAddr& node_addr)
-    : pool_option_(option), target_((node_addr)){
+    : pool_option_(option), target_((node_addr)) {
   executor_shards_ = std::make_unique<Shard[]>(option.num_shard_group);
   max_num_per_shard_ = std::ceil(pool_option_.max_size / option.num_shard_group);
 }
@@ -49,8 +49,7 @@ RefPtr<MysqlExecutor> MysqlExecutorPool::GetOrCreate() {
             return executor;
           else
             idle_executor = executor;
-        }
-        else {
+        } else {
           idle_executor = executor;
         }
       } else {
@@ -67,7 +66,7 @@ RefPtr<MysqlExecutor> MysqlExecutorPool::GetOrCreate() {
 
   executor = CreateExecutor(shard_id);
 
-  if(executor->Connect()) {
+  if (executor->Connect()) {
     executor_num_.fetch_add(1, std::memory_order_relaxed);
     return executor;
   }
@@ -94,8 +93,7 @@ RefPtr<MysqlExecutor> MysqlExecutorPool::CreateExecutor(uint32_t shard_id) {
 }
 
 void MysqlExecutorPool::Reclaim(int ret, RefPtr<MysqlExecutor>&& executor) {
-
-  if(ret == 0) {
+  if (ret == 0) {
     uint32_t shard_id = (executor->GetExecutorId() >> 32);
     auto& shard = executor_shards_[shard_id % pool_option_.num_shard_group];
 
@@ -143,14 +141,11 @@ void MysqlExecutorPool::Destroy() {
   }
 }
 
-RefPtr<MysqlExecutor> MysqlExecutorPool::GetExecutor() {
-  return GetOrCreate();
-}
+RefPtr<MysqlExecutor> MysqlExecutorPool::GetExecutor() { return GetOrCreate(); }
 
 bool MysqlExecutorPool::IsIdleTimeout(RefPtr<MysqlExecutor> executor) {
   if (executor != nullptr) {
-    if (pool_option_.max_idle_time == 0 ||
-        executor->GetAliveTime() < pool_option_.max_idle_time) {
+    if (pool_option_.max_idle_time == 0 || executor->GetAliveTime() < pool_option_.max_idle_time) {
       return false;
     }
     return true;
@@ -158,5 +153,4 @@ bool MysqlExecutorPool::IsIdleTimeout(RefPtr<MysqlExecutor> executor) {
   return false;
 }
 
-
-}
+}  // namespace trpc::mysql

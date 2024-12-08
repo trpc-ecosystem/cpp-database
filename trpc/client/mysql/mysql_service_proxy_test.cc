@@ -29,6 +29,7 @@ using trpc::mysql::OnlyExec;
 using trpc::mysql::NativeString;
 using trpc::mysql::MysqlResults;
 using trpc::mysql::MysqlTime;
+using trpc::mysql::MysqlBlob;
 using trpc::mysql::TransactionHandle;
 using trpc::mysql::TxHandlePtr;
 
@@ -165,6 +166,17 @@ TEST_F(MysqlServiceProxyTest, Query) {
   auto& res_vec = res.ResultSet();
   EXPECT_EQ(true, s.OK());
   EXPECT_EQ("alice", std::get<1>(res_vec[0]));
+
+  MysqlResults<int, std::string, std::string, MysqlTime, MysqlBlob> total_res;
+  s = mock_mysql_service_proxy_->Query(client_context, total_res, "select * from users");
+  EXPECT_EQ(true, s.OK());
+  EXPECT_EQ(4, total_res.ResultSet().size());
+
+  MysqlResults<NativeString> table_desc;
+  s = mock_mysql_service_proxy_->Query(client_context, table_desc, "describe users");
+  EXPECT_EQ(true, s.OK());
+  mock_mysql_service_proxy_->PrintResultTable(table_desc);
+
 }
 
 TEST_F(MysqlServiceProxyTest, AsyncQuery) {

@@ -17,8 +17,8 @@
 #include <tuple>
 #include <variant>
 #include <vector>
+
 #include "mysqlclient/mysql.h"
-#include "mysql_binder.h"
 #include "trpc/client/mysql/mysql_error_number.h"
 #include "trpc/util/log/logging.h"
 

@@ -19,15 +19,17 @@
 #include <string>
 #include <utility>
 
+#include "trpc/client/mysql/codec/mysql_protocol.h"
 #include "trpc/client/client_context.h"
 #include "trpc/codec/client_codec.h"
-#include "mysql_protocol.h"
 
 namespace trpc::mysql {
 
 /// @brief MySQL client-side codec for encoding request messages and decoding response messages.
-/// @details This is a dummy codec as we directly utilizes the MySQL API, bypassing the transport layer.
-/// @note For internal use only; not intended for public interfaces.
+/// @details This is a dummy codec since we directly utilize the MySQL API, bypassing the transport layer.
+/// The client context requires a codec instance from the service proxy. Therefore, this codec is implemented
+/// to allow instantiation, although its members are not expected to be used in practice.
+/// @note For internal use only; not intended for public APIs.
 class MysqlClientCodec : public ClientCodec {
  public:
   /// @private For internal use purpose only.
@@ -98,4 +100,4 @@ class MysqlClientCodec : public ClientCodec {
   ProtocolPtr CreateResponsePtr() override;
 };
 
-}  // namespace trpc
+}  // namespace trpc::mysql

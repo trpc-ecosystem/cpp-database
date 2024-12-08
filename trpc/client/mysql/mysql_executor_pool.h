@@ -14,19 +14,19 @@
 #pragma once
 
 #include <condition_variable>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
-#include <list>
+
 #include "trpc/client/mysql/executor/mysql_executor.h"
 #include "trpc/transport/common/transport_message_common.h"
-
 
 namespace trpc::mysql {
 
 struct MysqlExecutorPoolOption {
-  uint32_t max_size{0};       // Maximum number of connections in the pool
+  uint32_t max_size{0};  // Maximum number of connections in the pool
 
   uint64_t max_idle_time{0};  // Maximum idle time for connections
 
@@ -45,9 +45,10 @@ class MysqlExecutorPool {
  public:
   MysqlExecutorPool(const MysqlExecutorPoolOption& option, const NodeAddr& node_addr);
 
-
-  /// @return An executor ptr. Need to use MysqlExecutor::IsConnected to check state.
-  ///  and can get error by MysqlExecutor::GetErrorMessage
+  /// @return A pointer to the executor. Use MysqlExecutor::IsConnected to check the connection state.
+  /// Errors can be retrieved using MysqlExecutor::GetErrorMessage.
+  /// @note This function does not return a null pointer. This design ensures that external code can
+  /// retrieve error information from the executor without adding extra parameters.
   RefPtr<MysqlExecutor> GetExecutor();
 
   void Reclaim(int ret, RefPtr<MysqlExecutor>&&);
@@ -81,10 +82,8 @@ class MysqlExecutorPool {
   std::unique_ptr<Shard[]> executor_shards_;
 
   std::atomic<uint32_t> shard_id_gen_{0};
-  std::atomic<uint32_t> executor_id_gen_{0};
 
+  std::atomic<uint32_t> executor_id_gen_{0};
 };
 
-
-} // namespace trpc::mysql
-
+}  // namespace trpc::mysql

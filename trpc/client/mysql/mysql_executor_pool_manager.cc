@@ -12,13 +12,12 @@
 //
 
 #include "trpc/client/mysql/mysql_executor_pool_manager.h"
+
 #include <sstream>
 
-namespace trpc {
-namespace mysql {
+namespace trpc::mysql {
 
-MysqlExecutorPoolManager::MysqlExecutorPoolManager(const MysqlExecutorPoolOption& option) : option_(option) {
-}
+MysqlExecutorPoolManager::MysqlExecutorPoolManager(const MysqlExecutorPoolOption& option) : option_(option) {}
 
 MysqlExecutorPool* MysqlExecutorPoolManager::Get(const NodeAddr& node_addr) {
   const int len = 64;
@@ -53,8 +52,7 @@ MysqlExecutorPool* MysqlExecutorPoolManager::CreateExecutorPool(const NodeAddr& 
 void MysqlExecutorPoolManager::Stop() {
   executor_pools_.GetAllItems(pools_to_destroy_);
 
-  for(auto& [key, pool] : pools_to_destroy_)
-    pool->Stop();
+  for (auto& [key, pool] : pools_to_destroy_) pool->Stop();
 }
 
 void MysqlExecutorPoolManager::Destroy() {
@@ -68,5 +66,4 @@ void MysqlExecutorPoolManager::Destroy() {
   pools_to_destroy_.clear();
 }
 
-}  // namespace mysql
-}  // namespace trpc
+}  // namespace trpc::mysql
