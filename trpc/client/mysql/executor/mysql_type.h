@@ -13,8 +13,9 @@
 
 #pragma once
 
-#include "mysqlclient/mysql.h"
 #include <string>
+
+#include "mysqlclient/mysql.h"
 
 namespace trpc::mysql {
 
@@ -57,17 +58,14 @@ class MysqlTime {
 
   enum_mysql_timestamp_type GetTimeType() const;
 
-
   /// @brief Converts the MYSQL_TIME object to a string representation.
   /// The format of the string is "YYYY-MM-DD HH:MM:SS".
   std::string ToString() const;
 
-
   /// @brief Parses a string in the format "YYYY-MM-DD HH:MM:SS"
   /// and updates the MYSQL_TIME object accordingly.
   /// The input string must match the expected format.
-  void FromString(const std::string& timeStr);
-
+  void FromString(const std::string& time_str);
 
   /// @brief For mysql_binder.h
   const char* DataConstPtr() const;
@@ -76,15 +74,13 @@ class MysqlTime {
   MYSQL_TIME mt_{};
 };
 
-
 class MysqlBlob {
  public:
   MysqlBlob() = default;
 
-  MysqlBlob(const MysqlBlob& other)  = default;
+  MysqlBlob(const MysqlBlob& other) = default;
 
   MysqlBlob(MysqlBlob&& other) noexcept;
-
 
   explicit MysqlBlob(const std::string& data);
 
@@ -108,4 +104,4 @@ class MysqlBlob {
   std::string data_;
 };
 
-}
+}  // namespace trpc::mysql

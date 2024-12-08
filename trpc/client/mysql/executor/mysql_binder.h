@@ -13,15 +13,15 @@
 
 #pragma once
 
-#include "mysqlclient/mysql.h"
 #include <cstring>
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <iostream>
+#include <unordered_set>
+
+#include "mysqlclient/mysql.h"
 #include "trpc/client/mysql/executor/mysql_type.h"
 #include "trpc/util/string_util.h"
-#include <unordered_set>
 
 
 namespace trpc::mysql {

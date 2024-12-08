@@ -13,23 +13,19 @@
 
 #pragma once
 
-#include "mysqlclient/mysql.h"
-#include <chrono>
-#include <iostream>
 #include <mutex>
-#include <string>
 #include <type_traits>
-#include <variant>
-#include <vector>
-#include "trpc/common/status.h"
+
+#include "mysqlclient/mysql.h"
 #include "trpc/client/mysql/executor/mysql_binder.h"
 #include "trpc/client/mysql/executor/mysql_results.h"
 #include "trpc/client/mysql/executor/mysql_statement.h"
+#include "trpc/client/mysql/mysql_error_number.h"
+#include "trpc/common/status.h"
+#include "trpc/util/log/logging.h"
 #include "trpc/util/ref_ptr.h"
 #include "trpc/util/string_util.h"
 #include "trpc/util/time.h"
-#include "trpc/util/log/logging.h"
-#include "trpc/client/mysql/mysql_error_number.h"
 
 namespace trpc::mysql {
 
@@ -74,9 +70,7 @@ class Formatter {
   }
 };
 
-
 struct MysqlConnOption {
-
   std::string hostname;
 
   std::string username;
@@ -96,15 +90,14 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
  private:
   template <typename... OutputArgs>
   class QueryHandle {
-
    public:
     using DataBufferT = std::vector<std::vector<std::byte>>;
+
     using FlagBufferT = std::vector<uint8_t>;
 
     QueryHandle(MysqlResults<OutputArgs...>* mysql_results, MysqlStatement* statement, size_t field_count);
 
    private:
-
     template <std::size_t... Indices>
     void ResizeBuffers(std::index_sequence<Indices...>);
 
@@ -128,11 +121,10 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
     std::vector<size_t> dynamic_buffer_index;
 
    private:
-    size_t dynamic_buffer_size_;    // the initial buffer size of variant size type (string, blob)
+    size_t dynamic_buffer_size_;  // the initial buffer size of variant size type (string, blob)
   };
 
  public:
-
   MysqlExecutor(const MysqlConnOption& option);
 
   MysqlExecutor(MysqlConnOption&& option);
@@ -206,11 +198,9 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
 
   std::string GetIp() const;
 
-  uint16_t  GetPort() const;
-
+  uint16_t GetPort() const;
 
  private:
-
   ///@note: Only this overload will use mysql prepared statement api.
   template <typename... InputArgs, typename... OutputArgs>
   bool QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results, const std::string& query, const InputArgs&... args);
@@ -244,7 +234,6 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
 
   template <typename... OutputArgs>
   bool FetchTruncatedResults(MysqlExecutor::QueryHandle<OutputArgs...>& handle);
-
 
  private:
   /// Just protects the `mysql_init` api
@@ -317,11 +306,10 @@ void MysqlExecutor::BindInputArgs(std::vector<MYSQL_BIND>& params, const InputAr
 
 template <typename... OutputArgs>
 void MysqlExecutor::BindOutputs(MysqlExecutor::QueryHandle<OutputArgs...>& handle) {
-
   // 1. Set the buffer type
   MYSQL_FIELD* fields_meta = mysql_fetch_fields(handle.statement->GetResultsMeta());
   // The output_binds length and num fields must be checked before this function.
-  for(size_t i = 0; i < (*handle.output_binds).size(); i++) {
+  for (size_t i = 0; i < (*handle.output_binds).size(); i++) {
     handle.output_binds->at(i).buffer_type = fields_meta[i].type;
   }
 
@@ -351,7 +339,7 @@ bool MysqlExecutor::QueryAllInternal(MysqlResults<OutputArgs...>& mysql_results,
   }
 
   std::string field_type_check_message = CheckFieldsOutputArgs<OutputArgs...>(stmt.GetResultsMeta());
-  if((!field_type_check_message.empty())) {
+  if ((!field_type_check_message.empty())) {
     mysql_results.SetErrorMessage(std::move(field_type_check_message));
     mysql_results.SetErrorNumber(TrpcMysqlRetCode::TRPC_MYSQL_STMT_PARAMS_ERROR);
     stmt.CloseStatement();

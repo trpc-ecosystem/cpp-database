@@ -13,9 +13,9 @@
 
 #pragma once
 
+#include <cassert>
 #include <string>
 #include <vector>
-#include <cassert>
 
 #include "mysqlclient/mysql.h"
 #include "trpc/util/log/logging.h"
@@ -23,10 +23,13 @@
 namespace trpc::mysql {
 
 class MysqlStatement {
-public:
+ public:
   MysqlStatement(MYSQL* conn);
+
   ~MysqlStatement() { TRPC_ASSERT(mysql_stmt_ == nullptr); }
+
   MysqlStatement(MysqlStatement&& rhs) = default;
+
   MysqlStatement(MysqlStatement& rhs) = delete;
 
   bool Init(const std::string& sql);
@@ -49,10 +52,13 @@ public:
 
   bool IsValid() { return mysql_stmt_ == nullptr; }
 
-private:
+ private:
   MYSQL_STMT* mysql_stmt_;
+
   MYSQL* mysql_;
+
   unsigned int field_count_;
+
   unsigned long params_count_;
 };
 

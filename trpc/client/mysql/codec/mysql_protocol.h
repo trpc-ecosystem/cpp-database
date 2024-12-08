@@ -68,4 +68,4 @@ class MySQLResponseProtocol : public trpc::Protocol {
 using MySQLRequestProtocolPtr = std::shared_ptr<MySQLRequestProtocol>;
 using MySQLResponseProtocolPtr = std::shared_ptr<MySQLResponseProtocol>;
 
-}  // namespace trpc
+}  // namespace trpc::mysql

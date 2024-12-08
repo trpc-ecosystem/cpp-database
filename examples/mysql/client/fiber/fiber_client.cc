@@ -11,11 +11,12 @@
 //
 //
 
-#include <gflags/gflags.h>
 
 #include <iostream>
 #include <memory>
 #include <string>
+
+#include <gflags/gflags.h>
 #include "trpc/util/string_util.h"
 #include "trpc/client/make_client_context.h"
 #include "trpc/client/mysql/mysql_plugin.h"

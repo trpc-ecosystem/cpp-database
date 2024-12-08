@@ -13,8 +13,11 @@
 
 include(FetchContent)
 
-set(TRPC_CPP_GIT_URL https://github.com/trpc-group/trpc-cpp.git)
-set(TRPC_CPP_GIT_TAG main)
+#set(TRPC_CPP_GIT_URL https://github.com/trpc-group/trpc-cpp.git)
+#set(TRPC_CPP_GIT_TAG main)
+
+set(TRPC_CPP_GIT_URL https://github.com/KosmosFult/trpc-cpp.git)
+set(TRPC_CPP_GIT_TAG mysql-main-repo)
 
 FetchContent_Declare(
     trpc-cpp

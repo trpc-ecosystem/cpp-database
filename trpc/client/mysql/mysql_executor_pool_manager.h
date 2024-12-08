@@ -17,6 +17,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+
 #include "trpc/client/mysql/mysql_executor_pool.h"
 #include "trpc/transport/common/transport_message_common.h"
 #include "trpc/util/concurrency/lightly_concurrent_hashmap.h"
@@ -38,8 +39,10 @@ class MysqlExecutorPoolManager {
 
  private:
   concurrency::LightlyConcurrentHashMap<std::string, MysqlExecutorPool*> executor_pools_;
+
   std::unordered_map<std::string, MysqlExecutorPool*> pools_to_destroy_;
+
   MysqlExecutorPoolOption option_;
 };
 
-}
+}  // namespace trpc::mysql

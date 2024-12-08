@@ -11,22 +11,18 @@
 //
 //
 
-#include <gflags/gflags.h>
 
 #include <iostream>
 #include <memory>
 #include <string>
-#include <thread>
 
-#include <iostream>
-#include "trpc/client/client_context.h"
+#include <gflags/gflags.h>
 #include "trpc/client/make_client_context.h"
 #include "trpc/client/mysql/mysql_plugin.h"
 #include "trpc/client/service_proxy.h"
 #include "trpc/client/trpc_client.h"
 #include "trpc/common/runtime_manager.h"
 #include "trpc/log/trpc_log.h"
-#include "trpc/util/latch.h"
 #include "trpc/future/future_utility.h"
 
 using trpc::mysql::OnlyExec;

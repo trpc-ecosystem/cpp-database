@@ -17,15 +17,14 @@
 
 namespace trpc::mysql {
 
-class TransactionHandle : public RefCounted<TransactionHandle>{
-
+class TransactionHandle : public RefCounted<TransactionHandle> {
  public:
   /// @note When the handle has been moved, it's state would be set to kInValid
-  enum class TxState {kNotInited, kStarted, kRollBacked, kCommitted, kInValid};
+  enum class TxState { kNotInited, kStarted, kRollBacked, kCommitted, kInValid };
 
-  explicit TransactionHandle(RefPtr<MysqlExecutor> &&executor) : executor_(std::move(executor)) {}
+  explicit TransactionHandle(RefPtr<MysqlExecutor>&& executor) : executor_(std::move(executor)) {}
 
-  TransactionHandle() :executor_(nullptr) {}
+  TransactionHandle() : executor_(nullptr) {}
 
   TransactionHandle& operator=(TransactionHandle&& other) noexcept {
     state_ = other.state_;
@@ -48,7 +47,7 @@ class TransactionHandle : public RefCounted<TransactionHandle>{
 
   ~TransactionHandle() {
     // usually executor_ would be nullptr(be reclaimed)
-    if(executor_) {
+    if (executor_) {
       TRPC_FMT_ERROR("TransactionHandle destructed but executor is not reclaimed.");
       executor_->Close();
     }
@@ -59,9 +58,8 @@ class TransactionHandle : public RefCounted<TransactionHandle>{
 
   TxState GetState() { return state_; }
 
-  bool SetExecutor(RefPtr<MysqlExecutor> &&executor) {
-    if(executor_)
-        return false;
+  bool SetExecutor(RefPtr<MysqlExecutor>&& executor) {
+    if (executor_) return false;
     executor_ = std::move(executor);
     return true;
   }
@@ -75,7 +73,5 @@ class TransactionHandle : public RefCounted<TransactionHandle>{
   TxState state_{TxState::kNotInited};
 };
 
-
 using TxHandlePtr = RefPtr<TransactionHandle>;
-}
-
+}  // namespace trpc::mysql

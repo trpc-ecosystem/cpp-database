@@ -15,20 +15,11 @@
 
 namespace trpc::mysql {
 
-bool MySQLRequestProtocol::ZeroCopyDecode(NoncontiguousBuffer &buff) {
-  return true;
-}
+bool MySQLRequestProtocol::ZeroCopyDecode(NoncontiguousBuffer& buff) { return true; }
 
-bool MySQLRequestProtocol::ZeroCopyEncode(NoncontiguousBuffer &buff) {
-  return true;
-}
+bool MySQLRequestProtocol::ZeroCopyEncode(NoncontiguousBuffer& buff) { return true; }
 
+bool MySQLResponseProtocol::ZeroCopyDecode(NoncontiguousBuffer& buff) { return true; }
 
-bool MySQLResponseProtocol::ZeroCopyDecode(NoncontiguousBuffer &buff) {
-  return true;
-}
-
-bool MySQLResponseProtocol::ZeroCopyEncode(NoncontiguousBuffer &buff) {
-  return true;
-}
-}
+bool MySQLResponseProtocol::ZeroCopyEncode(NoncontiguousBuffer& buff) { return true; }
+}  // namespace trpc::mysql

@@ -39,9 +39,9 @@ cc_library(
     name = "mysql_results",
     hdrs = ["mysql_results.h"],
     deps = [
-        "@mysqlclient//:mysqlclient",
+        ":mysql_binder",
         "//trpc/client/mysql:mysql_error_number",
-        ":mysql_binder"
+        "@mysqlclient//:mysqlclient",
         ],
     visibility = ["//visibility:public"]
 )
@@ -51,9 +51,9 @@ cc_library(
     srcs = ["mysql_executor.cc"],
     hdrs = ["mysql_executor.h",],
     deps = [
-        ":mysql_statement",
         ":mysql_results",
         ":mysql_binder",
+        ":mysql_statement",
         "@trpc_cpp//trpc/util:time",
         "@trpc_cpp//trpc/util:ref_ptr",
         "@trpc_cpp//trpc/util/log:logging",

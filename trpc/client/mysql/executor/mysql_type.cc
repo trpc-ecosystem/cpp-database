@@ -11,13 +11,14 @@
 //
 //
 
-#include <sstream>
 #include "trpc/client/mysql/executor/mysql_type.h"
-#include "trpc/util/time.h"
+
+#include <sstream>
+
 #include "trpc/util/log/logging.h"
+#include "trpc/util/time.h"
 
 namespace trpc::mysql {
-
 
 MysqlTime::MysqlTime() {
   mt_.year = 2024;
@@ -31,18 +32,15 @@ MysqlTime::MysqlTime() {
   mt_.neg = 0;
 }
 
-MysqlTime::MysqlTime(MYSQL_TIME my_time) {
-  mt_ = my_time;
-}
+MysqlTime::MysqlTime(MYSQL_TIME my_time) { mt_ = my_time; }
 
-
-MysqlTime &MysqlTime::SetYear(unsigned int year) {
+MysqlTime& MysqlTime::SetYear(unsigned int year) {
   mt_.year = year;
   return *this;
 }
 
-MysqlTime &MysqlTime::SetMonth(unsigned int month) {
-  if(month > 0 && month <= 12) {
+MysqlTime& MysqlTime::SetMonth(unsigned int month) {
+  if (month > 0 && month <= 12) {
     mt_.month = month;
   } else {
     TRPC_FMT_ERROR("MysqlTime::SetMonth ({}) Failed.", month);
@@ -50,13 +48,13 @@ MysqlTime &MysqlTime::SetMonth(unsigned int month) {
   return *this;
 }
 
-MysqlTime &MysqlTime::SetDay(unsigned int day) {
+MysqlTime& MysqlTime::SetDay(unsigned int day) {
   mt_.day = day;
   return *this;
 }
 
-MysqlTime &MysqlTime::SetHour(unsigned int hour) {
-  if(hour <= 24) {
+MysqlTime& MysqlTime::SetHour(unsigned int hour) {
+  if (hour <= 24) {
     mt_.hour = hour;
   } else {
     TRPC_FMT_ERROR("MysqlTime::SetHour ({}) Failed.", hour);
@@ -64,8 +62,8 @@ MysqlTime &MysqlTime::SetHour(unsigned int hour) {
   return *this;
 }
 
-MysqlTime &MysqlTime::SetMinute(unsigned int minute) {
-  if(minute <= 60) {
+MysqlTime& MysqlTime::SetMinute(unsigned int minute) {
+  if (minute <= 60) {
     mt_.minute = minute;
   } else {
     TRPC_FMT_ERROR("MysqlTime::SetMinute ({}) Failed.", minute);
@@ -73,8 +71,8 @@ MysqlTime &MysqlTime::SetMinute(unsigned int minute) {
   return *this;
 }
 
-MysqlTime &MysqlTime::SetSecond(unsigned int second) {
-  if(second <= 60) {
+MysqlTime& MysqlTime::SetSecond(unsigned int second) {
+  if (second <= 60) {
     mt_.second = second;
   } else {
     TRPC_FMT_ERROR("MysqlTime::SetSecond ({}) Failed.", second);
@@ -82,13 +80,12 @@ MysqlTime &MysqlTime::SetSecond(unsigned int second) {
   return *this;
 }
 
-MysqlTime &MysqlTime::SetSecondPart(unsigned long second_part) {
+MysqlTime& MysqlTime::SetSecondPart(unsigned long second_part) {
   mt_.second_part = second_part;
   return *this;
 }
 
-
-MysqlTime &MysqlTime::SetTimeType(enum_mysql_timestamp_type time_type) {
+MysqlTime& MysqlTime::SetTimeType(enum_mysql_timestamp_type time_type) {
   mt_.time_type = time_type;
   return *this;
 }
@@ -110,63 +107,46 @@ unsigned long MysqlTime::SetSecondPart() const { return mt_.second_part; }
 enum_mysql_timestamp_type MysqlTime::GetTimeType() const { return mt_.time_type; }
 
 std::string MysqlTime::ToString() const {
-  return time::StringFormat("%04d-%02d-%02d %02d:%02d:%02d", mt_.year, mt_.month,
-                            mt_.day, mt_.hour, mt_.minute, mt_.second);
+  return time::StringFormat("%04d-%02d-%02d %02d:%02d:%02d", mt_.year, mt_.month, mt_.day, mt_.hour, mt_.minute,
+                            mt_.second);
 }
 
-void MysqlTime::FromString(const std::string &timeStr) {
-  std::istringstream iss(timeStr);
+void MysqlTime::FromString(const std::string& time_str) {
+  std::istringstream iss(time_str);
   char delimiter;
-  iss >> mt_.year >> delimiter >> mt_.month >> delimiter >> mt_.day
-      >> mt_.hour >> delimiter >> mt_.minute >> delimiter >> mt_.second;
+  iss >> mt_.year >> delimiter >> mt_.month >> delimiter >> mt_.day >> mt_.hour >> delimiter >> mt_.minute >>
+      delimiter >> mt_.second;
 }
 
-const char *MysqlTime::DataConstPtr() const {
-  return reinterpret_cast<const char *>(&mt_);
-}
+const char* MysqlTime::DataConstPtr() const { return reinterpret_cast<const char*>(&mt_); }
 
+MysqlBlob::MysqlBlob(MysqlBlob&& other) noexcept : data_(std::move(other.data_)) {}
 
+MysqlBlob::MysqlBlob(const std::string& data) : data_(data) {}
 
-MysqlBlob::MysqlBlob(MysqlBlob &&other) noexcept:
-        data_(std::move(other.data_)
-        ) {
-}
+MysqlBlob::MysqlBlob(std::string&& data) noexcept : data_(std::move(data)) {}
 
+MysqlBlob::MysqlBlob(const char* data, std::size_t length) : data_(data, length) {}
 
-MysqlBlob::MysqlBlob(const std::string &data) : data_(data) {}
-
-MysqlBlob::MysqlBlob(std::string &&data) noexcept: data_(std::move(data)) {}
-
-MysqlBlob::MysqlBlob(const char *data, std::size_t length) : data_(data, length) {}
-
-MysqlBlob &MysqlBlob::operator=(const MysqlBlob &other) {
+MysqlBlob& MysqlBlob::operator=(const MysqlBlob& other) {
   if (this != &other) {
     data_ = other.data_;
   }
   return *this;
 }
 
-MysqlBlob &MysqlBlob::operator=(MysqlBlob &&other)
-noexcept {
+MysqlBlob& MysqlBlob::operator=(MysqlBlob&& other) noexcept {
   if (this != &other) {
     data_ = std::move(other.data_);
   }
   return *this;
 }
 
-bool MysqlBlob::operator==(const MysqlBlob &other) const {
-  return data_ == other.data_;
-}
+bool MysqlBlob::operator==(const MysqlBlob& other) const { return data_ == other.data_; }
 
-const char *MysqlBlob::DataConstPtr() const {
-  return data_.data();
-}
+const char* MysqlBlob::DataConstPtr() const { return data_.data(); }
 
-size_t MysqlBlob::Size() const {
-  return data_.size();
-}
+size_t MysqlBlob::Size() const { return data_.size(); }
 
-std::string_view MysqlBlob::AsStringView() {
-  return data_;
-}
-}
+std::string_view MysqlBlob::AsStringView() { return data_; }
+}  // namespace trpc::mysql

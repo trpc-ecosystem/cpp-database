@@ -19,8 +19,7 @@
 namespace trpc::mysql {
 
 bool InitPlugin() {
-  ::trpc::codec::InitCodecPlugins<MysqlClientCodec>();
-  return true;
+  return ::trpc::codec::InitCodecPlugins<MysqlClientCodec>();
 }
 
 }

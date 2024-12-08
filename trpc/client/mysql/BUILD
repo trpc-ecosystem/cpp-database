@@ -64,7 +64,6 @@ cc_library(
     hdrs = ["mysql_service_proxy.h"],
     deps = [
         ":transaction",
-        ":mysql_error_number",
         ":mysql_executor_pool_manager",
         "//trpc/client/mysql/config:mysql_client_conf_parser",
         "@trpc_cpp//trpc/client:service_proxy_option",
