@@ -237,6 +237,14 @@ class MysqlExecutor : public RefCounted<MysqlExecutor> {
 
  private:
   /// Just protects the `mysql_init` api
+  /// Official documentation: “In a nonmultithreaded environment, the call to mysql_library_init() may be omitted,
+  /// because mysql_init() invokes it automatically as necessary. However, mysql_library_init() is not thread-safe in a
+  /// multithreaded environment, and thus neither is mysql_init(), which calls mysql_library_init(). You must either
+  /// call mysql_library_init() prior to spawning any threads, or else use a mutex to protect the call, whether you
+  /// invoke mysql_library_init() or indirectly through mysql_init(). Do this prior to any other client library call.”
+  /// The documentation here is not very clear.
+  /// Even if mysql_library_init() is called manually (e.g., placed in InitPlugin()), it is unclear whether protecting
+  /// subsequent calls to mysql_init() is necessary. To ensure safety, mysql_init() is protected directly.
   static std::mutex mysql_mutex;
 
   bool is_connected{false};

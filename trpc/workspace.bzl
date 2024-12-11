@@ -9,20 +9,22 @@ def clean_dep(dep):
 
 # buildifier: disable=function-docstring-args
 def trpc_database_mysql_workspace(path_prefix = "", repo_name = "", **kwargs):
-    """Build rules for the trpc project
+    """Define workspace rules for the MySQL client dependency used in the tRPC project.
 
-    Note: The main idea is to determine the required version of dependent software during the build process
-          by passing in parameters.
     Args:
-        path_prefix: Path prefix.
-        repo_name: Repository name of the dependency.
-        kwargs: Keyword arguments, dictionary type, mainly used to specify the version and sha256 value of
-                dependent software, where the key of the keyword is constructed by the `name + version`.
-                eg: protobuf_ver,zlib_ver...
+        path_prefix: Path prefix for workspace configuration (currently unused in this function).
+        repo_name: Repository name for the dependency (currently unused in this function).
+        kwargs: Additional keyword arguments for specifying version and sha256 of dependencies.
+                For example:
+                - `mysqlclient_ver`: Version of the MySQL client library (default: "8.0.39").
+                - `mysqlclient_sha256`: SHA256 checksum of the specified MySQL client library version
+
     Example:
-        trpc_workspace(path_prefix="", repo_name="", protobuf_ver="xxx", protobuf_sha256="xxx", ...)
-        Here, `xxx` is the specific specified version. If the version is not specified through the key,
-        the default value will be used. eg: protobuf_ver = kwargs.get("protobuf_ver", "3.8.0")
+        trpc_database_mysql_workspace(
+            mysqlclient_ver="8.0.33",
+            mysqlclient_sha256="specific_sha256_value",
+        )
+
     """
 
     # libmysqlclient
