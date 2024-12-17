@@ -8,7 +8,7 @@ def clean_dep(dep):
     return str(Label(dep))
 
 # buildifier: disable=function-docstring-args
-def trpc_database_mysql_workspace(path_prefix = "", repo_name = "", **kwargs):
+def trpc_cpp_database_workspace(path_prefix = "", repo_name = "", **kwargs):
     """Define workspace rules for the MySQL client dependency used in the tRPC project.
 
     Args:
@@ -20,7 +20,7 @@ def trpc_database_mysql_workspace(path_prefix = "", repo_name = "", **kwargs):
                 - `mysqlclient_sha256`: SHA256 checksum of the specified MySQL client library version
 
     Example:
-        trpc_database_mysql_workspace(
+        trpc_cpp_database_workspace(
             mysqlclient_ver="8.0.33",
             mysqlclient_sha256="specific_sha256_value",
         )

@@ -39,13 +39,13 @@ MySQL数据库已经成为构建互联网世界的基石，尤其是其支持事
    trpc_workspace()
       
    git_repository(
-       name = "trpc_cpp_database_mysql",
+       name = "trpc_cpp_database",
        remote = "https://github.com/trpc-ecosystem/cpp-database.git",
        branch = "main",
    )
 
-   load("@trpc_cpp_database_mysql//trpc:workspace.bzl", "trpc_database_mysql_workspace")
-   trpc_database_mysql_workspace()
+   load("@trpc_cpp_database//trpc:workspace.bzl", "trpc_database_workspace")
+   trpc_database_workspace()
    ```
 2. 引入依赖
 
@@ -56,7 +56,7 @@ MySQL数据库已经成为构建互联网世界的基石，尤其是其支持事
     name = "fiber_client",
     srcs = ["fiber_client.cc"],
     deps = [
-        "@trpc_cpp_database_mysql//trpc/client/mysql:mysql_plugin",
+        "@trpc_cpp_database//trpc/client/mysql:mysql_plugin",
         ...
     ],
    )
@@ -77,14 +77,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(trpc-cpp)
 
-# Then, import trpc_cpp_database_mysql
+# Then, import trpc_cpp_database
 FetchContent_Declare(
-    trpc_cpp_database_mysql
-    GIT_REPOSITORY    https://github.com/trpc-ecosystem/cpp-database-mysql.git
+    trpc_cpp_database
+    GIT_REPOSITORY    https://github.com/trpc-ecosystem/cpp-database.git
     GIT_TAG           main
-    SOURCE_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/cmake_third_party/trpc_cpp_database_mysql
+    SOURCE_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/cmake_third_party/trpc_cpp_database
 )
-FetchContent_MakeAvailable(trpc_cpp_database_mysql)
+FetchContent_MakeAvailable(trpc_cpp_database)
 
 # Last, link to your target
 target_link_libraries(your_target trpc
@@ -331,7 +331,7 @@ else
   std::string error_msg = s.ErrorMessage();
   // error_msg: "Bind output type warning for fields: (email, created_at)."
   ```
-  具体匹配关系见下表：
+具体匹配关系见下表：
 
 | MySQL Type                   | Template Output Type                              |
 |------------------------------|---------------------------------------------------|
