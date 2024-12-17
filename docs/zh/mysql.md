@@ -44,8 +44,8 @@ MySQL数据库已经成为构建互联网世界的基石，尤其是其支持事
        branch = "main",
    )
 
-   load("@trpc_cpp_database//trpc:workspace.bzl", "trpc_database_workspace")
-   trpc_database_workspace()
+   load("@trpc_cpp_database//trpc:workspace.bzl", "trpc_cpp_database_workspace")
+   trpc_cpp_database_workspace()
    ```
 2. 引入依赖
 
@@ -99,7 +99,7 @@ target_link_libraries(your_target trpc
 ### 获取 MysqlServiceProxy 实例
 
 获取一个下游服务的访问代理对象，类型 trpc::mysql::MysqlServiceProxy。推荐使用 TrpcClient::GetProxy 方式获取，参考 [client_guide.md](https://github.com/trpc-group/trpc-cpp/blob/main/docs/zh/client_guide.md)。
-如果你希望脱离TrpcClient单独使用实例，请注意手动初始化（不推荐单独使用，因为各种初始化函数成员是protected，你需要继承后才能手动初始化），可以参考 [mysql_service_proxy_test.cc](./trpc/client/mysql/mysql_service_proxy_test.cc)
+如果你希望脱离TrpcClient单独使用实例，请注意手动初始化（不推荐单独使用，因为各种初始化函数成员是protected，你需要继承后才能手动初始化），可以参考 [mysql_service_proxy_test.cc](../../trpc/client/mysql/mysql_service_proxy_test.cc)
 
 #### 初始化配置
 
@@ -199,7 +199,7 @@ client:
 
 ##  查询结果类
 
-[mysql_results.h](./trpc/client/mysql/executor/mysql_results.h)
+[mysql_results.h](../../trpc/client/mysql/executor/mysql_results.h)
 
 ```c++
 template <typename... Args>
@@ -400,7 +400,7 @@ else
 
 ### 更多类型
 
-[mysql_type.h](./trpc/client/mysql/executor/mysql_type.h)
+[mysql_type.h](../../trpc/client/mysql/executor/mysql_type.h)
 
 对于 `MysqlResults<NativeString>` ，不需要关心查询结果的字段类型，因为都是以字符串的形式返回。如果希望将结果绑定到类型，对于日期和Blob，也可以使用 `MysqlTime` 和 `MysqlBlob` (当然你也同样可以使用 `std::string` 作为通用类型来接收)。
 
@@ -490,7 +490,7 @@ proxy->Execute(ctx, exec_res, "delete from users where username = \"jack\"");
 
 ### 事务
 
-[transaction.h](./trpc/client/mysql/transaction.h)
+[transaction.h](../../trpc/client/mysql/transaction.h)
 
 `TransactionHandle` 标识一个事务，实际应使用其引用计数指针 `TxHandlePtr`，下面将介绍如何使用 proxy 进行一个事务。
 
@@ -603,7 +603,7 @@ trpc::future::BlockingGet(std::move(future));
 
 这里 `proxy->AsyncQuery<int, std::string>(ctx, "select id, username from users where id = ?", 3)` 应当返回 `Future<MysqlResults<int, std::string>>` ，然后通过 `Then`  回调处理查询结果， 将 `AsyncQuery` 返回的 future 中的值获取出来，然后打印，最后返回一个就绪的空future。
 
-**对于异步事务接口**，参考 [future_client.cc](./examples/mysql/client/future/future_client.cc)
+**对于异步事务接口**，参考 [future_client.cc](../../examples/mysql/client/future/future_client.cc)
 
 ```c++
 MysqlResults<OnlyExec> exec_res;
