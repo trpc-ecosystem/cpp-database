@@ -13,9 +13,6 @@
 
 #pragma once
 
-#include "trpc/client/mysql/config/mysql_client_conf.h"
-#include "trpc/client/mysql/mysql_executor_pool_manager.h"
-#include "trpc/client/mysql/transaction.h"
 #include "trpc/client/service_proxy.h"
 #include "trpc/client/service_proxy_manager.h"
 #include "trpc/coroutine/fiber_event.h"
@@ -23,6 +20,10 @@
 #include "trpc/util/ref_ptr.h"
 #include "trpc/util/thread/latch.h"
 #include "trpc/util/thread/thread_pool.h"
+
+#include "trpc/client/mysql/config/mysql_client_conf.h"
+#include "trpc/client/mysql/mysql_executor_pool_manager.h"
+#include "trpc/client/mysql/transaction.h"
 
 namespace trpc::mysql {
 

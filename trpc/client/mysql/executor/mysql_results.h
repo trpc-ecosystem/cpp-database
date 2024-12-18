@@ -13,19 +13,14 @@
 
 #pragma once
 
-#include <string>
-#include <tuple>
-#include <variant>
-#include <vector>
-
 #include "mysqlclient/mysql.h"
-#include "trpc/client/mysql/mysql_error_number.h"
 #include "trpc/util/log/logging.h"
 
+#include "trpc/client/mysql/mysql_error_number.h"
 
 namespace trpc::mysql {
 
-constexpr size_t kDynamicBufferInitSize =64;
+constexpr size_t kDynamicBufferInitSize = 64;
 
 struct MysqlResultsOption {
   // The initial size of the buffer used to store variable-length data
@@ -33,7 +28,6 @@ struct MysqlResultsOption {
   // In many real-world applications, 64 bytes is sufficient to store common variable-length data
   size_t dynamic_buffer_init_size = kDynamicBufferInitSize;
 };
-
 
 ///@brief Just specialize class MysqlResults
 class OnlyExec {};
@@ -51,13 +45,11 @@ enum class MysqlResultsMode {
   NativeString,
 };
 
-
 template <typename... Args>
 struct ResultSetMapper {
   using type = std::vector<std::tuple<Args...>>;
   static constexpr MysqlResultsMode mode = MysqlResultsMode::BindType;
 };
-
 
 template <>
 struct ResultSetMapper<NativeString> {
@@ -69,9 +61,7 @@ template <>
 struct ResultSetMapper<OnlyExec> {
   using type = std::vector<std::tuple<OnlyExec>>;
   static constexpr MysqlResultsMode mode = MysqlResultsMode::OnlyExec;
-
 };
-
 
 ///
 ///@brief A class used to store the results of a MySQL query executed by the MysqlExecutor class.
@@ -94,7 +84,6 @@ class MysqlResults {
   friend class MysqlExecutor;
 
  public:
-
   static constexpr MysqlResultsMode mode = ResultSetMapper<Args...>::mode;
 
   using ResultSetType = typename ResultSetMapper<Args...>::type;
@@ -140,7 +129,6 @@ class MysqlResults {
   int GetErrorNumber() const;
 
  private:
-
   /// @brief Used for NativeString to the mysql_res_.
   /// @note  Must be called after Clear().
   void SetRawMysqlRes(MYSQL_RES* res);
@@ -188,8 +176,7 @@ void MysqlResults<Args...>::SetFieldsName(MYSQL_RES* res) {
   MYSQL_FIELD* fields_meta = mysql_fetch_fields(res);
   unsigned long fields_num = mysql_num_fields(res);
 
-  for (unsigned long i = 0; i < fields_num; ++i)
-    fields_name_.emplace_back(fields_meta[i].name);
+  for (unsigned long i = 0; i < fields_num; ++i) fields_name_.emplace_back(fields_meta[i].name);
 }
 
 template <typename... Args>
@@ -253,12 +240,12 @@ const std::string& MysqlResults<Args...>::GetErrorMessage() {
   return error_message_;
 }
 
-template<typename... Args>
+template <typename... Args>
 int MysqlResults<Args...>::GetErrorNumber() const {
   return error_number_;
 }
 
-template<typename... Args>
+template <typename... Args>
 int MysqlResults<Args...>::SetErrorNumber(int error_number) {
   return error_number_ = error_number;
 }
@@ -287,7 +274,6 @@ template <typename... Args>
 template <typename T>
 bool MysqlResults<Args...>::GetResultSet(T& res) {
   if (!has_value_) return false;
-
 
   if constexpr (mode == MysqlResultsMode::NativeString) {
     res.clear();
@@ -326,15 +312,12 @@ size_t MysqlResults<Args...>::SetAffectedRows(size_t n_rows) {
 
 template <typename... Args>
 bool MysqlResults<Args...>::IsValueNull(size_t row_index, size_t col_index) const {
-  if(null_flags_.empty())
-    return false;
+  if (null_flags_.empty()) return false;
 
-  if(row_index >= null_flags_.size() || col_index >= null_flags_[0].size())
-    return false;
+  if (row_index >= null_flags_.size() || col_index >= null_flags_[0].size()) return false;
 
   return null_flags_[row_index][col_index];
 }
-
 
 template <typename... Args>
 bool MysqlResults<Args...>::OK() const {

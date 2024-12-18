@@ -13,15 +13,10 @@
 
 #pragma once
 
-#include <deque>
-#include <list>
-#include <memory>
-#include <string>
-#include <utility>
+#include "trpc/codec/client_codec.h"
 
 #include "trpc/client/mysql/codec/mysql_protocol.h"
 #include "trpc/client/client_context.h"
-#include "trpc/codec/client_codec.h"
 
 namespace trpc::mysql {
 

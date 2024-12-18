@@ -13,8 +13,6 @@
 
 #include "trpc/client/mysql/mysql_executor_pool_manager.h"
 
-#include <sstream>
-
 namespace trpc::mysql {
 
 MysqlExecutorPoolManager::MysqlExecutorPoolManager(const MysqlExecutorPoolOption& option) : option_(option) {}

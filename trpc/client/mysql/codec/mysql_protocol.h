@@ -13,9 +13,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "trpc/codec/protocol.h"
 #include "trpc/util/buffer/noncontiguous_buffer.h"
 

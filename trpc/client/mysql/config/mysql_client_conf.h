@@ -13,10 +13,8 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-
 #include "yaml-cpp/yaml.h"
+
 namespace trpc::mysql {
 
 /// @brief Client config for accessing mysql

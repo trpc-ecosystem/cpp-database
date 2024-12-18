@@ -13,8 +13,9 @@
 
 #pragma once
 
-#include "trpc/client/mysql/config/mysql_client_conf.h"
 #include "yaml-cpp/yaml.h"
+
+#include "trpc/client/mysql/config/mysql_client_conf.h"
 
 namespace YAML {
 

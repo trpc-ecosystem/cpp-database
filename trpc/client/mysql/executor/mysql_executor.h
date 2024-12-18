@@ -17,15 +17,16 @@
 #include <type_traits>
 
 #include "mysqlclient/mysql.h"
-#include "trpc/client/mysql/executor/mysql_binder.h"
-#include "trpc/client/mysql/executor/mysql_results.h"
-#include "trpc/client/mysql/executor/mysql_statement.h"
-#include "trpc/client/mysql/mysql_error_number.h"
 #include "trpc/common/status.h"
 #include "trpc/util/log/logging.h"
 #include "trpc/util/ref_ptr.h"
 #include "trpc/util/string_util.h"
 #include "trpc/util/time.h"
+
+#include "trpc/client/mysql/executor/mysql_binder.h"
+#include "trpc/client/mysql/executor/mysql_results.h"
+#include "trpc/client/mysql/executor/mysql_statement.h"
+#include "trpc/client/mysql/mysql_error_number.h"
 
 namespace trpc::mysql {
 

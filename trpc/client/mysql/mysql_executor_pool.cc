@@ -13,9 +13,6 @@
 
 #include "trpc/client/mysql/mysql_executor_pool.h"
 
-#include <stdexcept>
-#include <thread>
-
 namespace trpc::mysql {
 
 constexpr int EXECUTOR_POOL_CONN_RETRY_NUM = 3;

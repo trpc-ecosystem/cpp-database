@@ -12,12 +12,11 @@
 //
 
 #include <utility>
-#include <vector>
 
-#include "include/gtest/gtest.h"
+#include "gtest/gtest.h"
+#include "trpc/util/random.h"
 
 #include "trpc/client/mysql/executor/mysql_executor.h"
-#include "trpc/util/random.h"
 
 namespace trpc::testing {
 

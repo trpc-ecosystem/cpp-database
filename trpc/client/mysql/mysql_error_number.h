@@ -13,15 +13,10 @@
 
 #pragma once
 
-#include "trpc/common/status.h"
-
 namespace trpc::mysql {
 
-/// The error numbers are the same with MySQL https://dev.mysql.com/doc/mysql-errors/8.0/en/error-reference-introduction.html
-/// except below
+/// The error numbers are the same with MySQL
+/// https://dev.mysql.com/doc/mysql-errors/8.0/en/error-reference-introduction.html except below
 
-enum TrpcMysqlRetCode : int {
-  TRPC_MYSQL_INVALID_HANDLE = 3502,
-  TRPC_MYSQL_STMT_PARAMS_ERROR = 3503
-};
-}
+enum TrpcMysqlRetCode : int { TRPC_MYSQL_INVALID_HANDLE = 3502, TRPC_MYSQL_STMT_PARAMS_ERROR = 3503 };
+}  // namespace trpc::mysql

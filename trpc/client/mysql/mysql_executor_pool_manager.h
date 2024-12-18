@@ -13,14 +13,12 @@
 
 #pragma once
 
-#include <memory>
-#include <mutex>
-#include <string>
 #include <unordered_map>
 
-#include "trpc/client/mysql/mysql_executor_pool.h"
 #include "trpc/transport/common/transport_message_common.h"
 #include "trpc/util/concurrency/lightly_concurrent_hashmap.h"
+
+#include "trpc/client/mysql/mysql_executor_pool.h"
 
 namespace trpc::mysql {
 

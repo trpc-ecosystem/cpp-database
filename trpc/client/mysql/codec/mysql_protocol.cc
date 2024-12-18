@@ -11,7 +11,7 @@
 //
 //
 
-#include "mysql_protocol.h"
+#include "trpc/client/mysql/codec/mysql_protocol.h"
 
 namespace trpc::mysql {
 
