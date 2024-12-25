@@ -161,7 +161,7 @@ client:
    mysql_conf.password = "abc123";
    mysql_conf.user_name = "root";
    mysql_conf.thread_num = 8;
-   mysql_conf.thread_bind_core = "1, 2-4";
+   mysql_conf.thread_bind_core = "1,2-4";
    auto proxy = ::trpc::GetTrpcClient()->GetProxy<::trpc::mysql::MysqlServiceProxy>("mysql_server");
    proxy->SetMysqlConfig(mysql_conf);
    ```
